@@ -1,0 +1,19 @@
+# YouTrack MCP Server Configuration
+
+[server]
+# Server port (default: 3204)
+# Can be overridden by YOUTRACK_SERVER_PORT environment variable
+port = 3204
+
+# Server name displayed in MCP protocol
+# Can be overridden by YOUTRACK_SERVER_NAME environment variable
+name = "YouTrack MCP Server"
+
+[logging]
+# Enable tool call logging to file (disabled by default)
+# Can be overridden by YOUTRACK_LOG_TOOL_CALLS environment variable
+log_tool_calls = false
+
+# File path for tool call logs (only used if log_tool_calls is true)
+# Can be overridden by YOUTRACK_LOG_TOOL_CALLS_FILE environment variable
+tool_calls_file = "tool_calls.log"
