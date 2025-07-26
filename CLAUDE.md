@@ -21,4 +21,6 @@ For each iterations
 - plan what need to be done
 - implement feature
 - ensure that build passes
+    - `go build -o yt ./cmd/yt`
+    - `go build -o youtrack-mcp ./cmd/youtrack-mcp`
 - run `go fmt`

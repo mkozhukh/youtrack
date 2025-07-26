@@ -3,11 +3,11 @@ package commands
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
-	"text/tabwriter"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
 
@@ -49,7 +49,6 @@ Supports partial matching for user lookups.`,
 }
 
 func init() {
-	rootCmd.AddCommand(usersCmd)
 	usersCmd.AddCommand(listUsersCmd)
 	usersCmd.AddCommand(userWorklogsCmd)
 
@@ -276,33 +275,53 @@ func formatUsersList(users []*youtrack.User) error {
 		return nil
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "LOGIN\tNAME\tEMAIL")
-	fmt.Fprintln(w, "─────\t────\t─────")
+	t := table.New().
+		Border(lipgloss.NormalBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("99"))).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			switch {
+			case row == 0:
+				return lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Bold(true)
+			default:
+				return lipgloss.NewStyle().Foreground(lipgloss.Color("246"))
+			}
+		}).
+		Headers("LOGIN", "NAME", "EMAIL")
 
 	for _, user := range users {
-		fmt.Fprintf(w, "%s\t%s\t%s\n",
-			user.Login,
-			user.FullName,
-			user.Email)
+		t.Row(user.Login, user.FullName, user.Email)
 	}
 
-	return w.Flush()
+	fmt.Println(t)
+	return nil
 }
 
 // formatUserWorklogs formats user worklogs for text output
 func formatUserWorklogs(user *youtrack.User, workItems []*youtrack.WorkItem) error {
-	fmt.Printf("Worklogs for %s (%s)\n", user.FullName, user.Login)
-	fmt.Printf("=================================\n\n")
+	headerStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("212")).
+		Bold(true)
+
+	fmt.Printf("%s\n", headerStyle.Render(fmt.Sprintf("Worklogs for %s (%s)", user.FullName, user.Login)))
+	fmt.Printf("%s\n\n", headerStyle.Render("=================================="))
 
 	if len(workItems) == 0 {
 		fmt.Println("No worklogs found")
 		return nil
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "DATE\tDURATION\tISSUE\tDESCRIPTION")
-	fmt.Fprintln(w, "────\t────────\t─────\t───────────")
+	t := table.New().
+		Border(lipgloss.NormalBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("99"))).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			switch {
+			case row == 0:
+				return lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Bold(true)
+			default:
+				return lipgloss.NewStyle().Foreground(lipgloss.Color("246"))
+			}
+		}).
+		Headers("DATE", "DURATION", "ISSUE", "DESCRIPTION")
 
 	for _, item := range workItems {
 		// Format duration from minutes to human readable
@@ -320,14 +339,16 @@ func formatUserWorklogs(user *youtrack.User, workItems []*youtrack.WorkItem) err
 			description = description[:47] + "..."
 		}
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
+		t.Row(
 			item.Date.Format("2006-01-02"),
 			duration,
 			issueID,
-			description)
+			description,
+		)
 	}
 
-	return w.Flush()
+	fmt.Println(t)
+	return nil
 }
 
 // formatDuration converts minutes to human readable format

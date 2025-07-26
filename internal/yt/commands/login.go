@@ -28,7 +28,7 @@ default to the current user.`,
 }
 
 func init() {
-	rootCmd.AddCommand(loginCmd)
+	// Command initialization
 }
 
 func runLogin(cmd *cobra.Command, args []string) error {
@@ -75,6 +75,14 @@ func runLogin(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to verify connection: %w", err)
 	}
 
+	// Prompt for default project (optional)
+	fmt.Print("Default project (optional, press Enter to skip): ")
+	project, err := reader.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("failed to read project: %w", err)
+	}
+	project = strings.TrimSpace(project)
+
 	// Create config
 	cfg := &config.Config{
 		Server: config.ServerConfig{
@@ -82,7 +90,8 @@ func runLogin(cmd *cobra.Command, args []string) error {
 			Token: token,
 		},
 		Defaults: config.DefaultsConfig{
-			UserID: userID,
+			UserID:  userID,
+			Project: project,
 		},
 	}
 

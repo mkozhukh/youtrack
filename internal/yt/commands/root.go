@@ -44,9 +44,11 @@ func Execute() {
 
 func init() {
 	// Add subcommands
+	rootCmd.AddCommand(loginCmd)
 	rootCmd.AddCommand(projectsCmd)
 	rootCmd.AddCommand(tickets.TicketsCmd)
 	rootCmd.AddCommand(usersCmd)
+	rootCmd.AddCommand(completionCmd)
 
 	// Global flags
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default is $HOME/.config/yt/config.toml)")

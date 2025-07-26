@@ -8,9 +8,10 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"text/tabwriter"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
 
@@ -435,9 +436,18 @@ func formatTicketsList(data interface{}) error {
 		return nil
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tSUMMARY\tASSIGNEE\tUPDATED\tTAGS")
-	fmt.Fprintln(w, "──\t───────\t────────\t───────\t────")
+	t := table.New().
+		Border(lipgloss.NormalBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("99"))).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			switch {
+			case row == 0:
+				return lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Bold(true)
+			default:
+				return lipgloss.NewStyle().Foreground(lipgloss.Color("246"))
+			}
+		}).
+		Headers("ID", "SUMMARY", "ASSIGNEE", "UPDATED", "TAGS")
 
 	for _, ticket := range tickets {
 		assignee := "Unassigned"
@@ -467,15 +477,17 @@ func formatTicketsList(data interface{}) error {
 			summary = summary[:57] + "..."
 		}
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+		t.Row(
 			ticket.ID,
 			summary,
 			assignee,
 			updated,
-			tags)
+			tags,
+		)
 	}
 
-	return w.Flush()
+	fmt.Println(t)
+	return nil
 }
 
 // formatTicketDetails formats ticket details for text output
@@ -1150,9 +1162,18 @@ func formatCommentsList(data interface{}) error {
 		return nil
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tAUTHOR\tCREATED\tTEXT")
-	fmt.Fprintln(w, "──\t──────\t───────\t────")
+	t := table.New().
+		Border(lipgloss.NormalBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("99"))).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			switch {
+			case row == 0:
+				return lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Bold(true)
+			default:
+				return lipgloss.NewStyle().Foreground(lipgloss.Color("246"))
+			}
+		}).
+		Headers("ID", "AUTHOR", "CREATED", "TEXT")
 
 	for _, comment := range comments {
 		author := "Unknown"
@@ -1175,14 +1196,16 @@ func formatCommentsList(data interface{}) error {
 		text = strings.ReplaceAll(text, "\n", " ")
 		text = strings.ReplaceAll(text, "\r", " ")
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
+		t.Row(
 			comment.ID,
 			author,
 			created,
-			text)
+			text,
+		)
 	}
 
-	return w.Flush()
+	fmt.Println(t)
+	return nil
 }
 
 // formatCommentAdded formats the added comment for text output
@@ -1301,9 +1324,18 @@ func formatAttachmentsList(data interface{}) error {
 		return nil
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tNAME\tSIZE\tAUTHOR\tCREATED")
-	fmt.Fprintln(w, "──\t────\t────\t──────\t───────")
+	t := table.New().
+		Border(lipgloss.NormalBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("99"))).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			switch {
+			case row == 0:
+				return lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Bold(true)
+			default:
+				return lipgloss.NewStyle().Foreground(lipgloss.Color("246"))
+			}
+		}).
+		Headers("ID", "NAME", "SIZE", "AUTHOR", "CREATED")
 
 	for _, attachment := range attachments {
 		author := "Unknown"
@@ -1320,15 +1352,17 @@ func formatAttachmentsList(data interface{}) error {
 		// Format file size in a human-readable way
 		size := formatFileSize(attachment.Size)
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+		t.Row(
 			attachment.ID,
 			attachment.Name,
 			size,
 			author,
-			created)
+			created,
+		)
 	}
 
-	return w.Flush()
+	fmt.Println(t)
+	return nil
 }
 
 // formatAttachmentAdded formats the added attachment for text output
@@ -1554,9 +1588,18 @@ func formatWorklogsList(data interface{}) error {
 		return nil
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tAUTHOR\tDATE\tDURATION\tDESCRIPTION")
-	fmt.Fprintln(w, "──\t──────\t────\t────────\t───────────")
+	t := table.New().
+		Border(lipgloss.NormalBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("99"))).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			switch {
+			case row == 0:
+				return lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Bold(true)
+			default:
+				return lipgloss.NewStyle().Foreground(lipgloss.Color("246"))
+			}
+		}).
+		Headers("ID", "AUTHOR", "DATE", "DURATION", "DESCRIPTION")
 
 	for _, worklog := range worklogs {
 		author := "Unknown"
@@ -1585,15 +1628,17 @@ func formatWorklogsList(data interface{}) error {
 			description = "-"
 		}
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+		t.Row(
 			worklog.ID,
 			author,
 			date,
 			duration,
-			description)
+			description,
+		)
 	}
 
-	return w.Flush()
+	fmt.Println(t)
+	return nil
 }
 
 // formatWorklogAdded formats the added worklog for text output

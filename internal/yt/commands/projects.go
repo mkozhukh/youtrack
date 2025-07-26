@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"os"
 	"strings"
-	"text/tabwriter"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
 
@@ -47,7 +47,6 @@ available custom fields, statuses, and types.`,
 }
 
 func init() {
-	rootCmd.AddCommand(projectsCmd)
 	projectsCmd.AddCommand(listProjectsCmd)
 	projectsCmd.AddCommand(describeProjectCmd)
 
@@ -213,23 +212,34 @@ func formatProjectsList(projects []*youtrack.Project) error {
 		return nil
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tNAME\tSHORT NAME\tDESCRIPTION")
-	fmt.Fprintln(w, "──\t────\t──────────\t───────────")
+	t := table.New().
+		Border(lipgloss.NormalBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("99"))).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			switch {
+			case row == 0:
+				return lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Bold(true)
+			default:
+				return lipgloss.NewStyle().Foreground(lipgloss.Color("246"))
+			}
+		}).
+		Headers("ID", "NAME", "SHORT NAME", "DESCRIPTION")
 
 	for _, project := range projects {
 		description := project.Description
 		if len(description) > 50 {
 			description = description[:47] + "..."
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
+		t.Row(
 			project.ID,
 			project.Name,
 			project.ShortName,
-			description)
+			description,
+		)
 	}
 
-	return w.Flush()
+	fmt.Println(t)
+	return nil
 }
 
 // formatProjectDetails formats project details for text output
