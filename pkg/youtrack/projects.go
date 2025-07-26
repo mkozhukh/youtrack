@@ -8,10 +8,10 @@ import (
 
 func (c *Client) GetProject(ctx *YouTrackContext, projectID string) (*Project, error) {
 	path := fmt.Sprintf("/api/admin/projects/%s", projectID)
-	
+
 	query := url.Values{}
 	query.Add("fields", "id,name,shortName,description")
-	
+
 	resp, err := c.Get(ctx, path, query)
 	if err != nil {
 		return nil, err

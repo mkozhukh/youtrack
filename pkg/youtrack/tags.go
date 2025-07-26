@@ -8,10 +8,10 @@ import (
 
 func (c *Client) GetIssueTags(ctx *YouTrackContext, issueID string) ([]*IssueTag, error) {
 	path := fmt.Sprintf("/api/issues/%s/tags", issueID)
-	
+
 	query := url.Values{}
 	query.Add("fields", "id,name,color")
-	
+
 	resp, err := c.Get(ctx, path, query)
 	if err != nil {
 		return nil, err
@@ -28,11 +28,11 @@ func (c *Client) GetIssueTags(ctx *YouTrackContext, issueID string) ([]*IssueTag
 
 func (c *Client) AddIssueTag(ctx *YouTrackContext, issueID string, tagName string) error {
 	path := fmt.Sprintf("/api/issues/%s/tags", issueID)
-	
+
 	req := map[string]interface{}{
 		"name": tagName,
 	}
-	
+
 	resp, err := c.Post(ctx, path, req)
 	if err != nil {
 		return err
@@ -44,7 +44,7 @@ func (c *Client) AddIssueTag(ctx *YouTrackContext, issueID string, tagName strin
 
 func (c *Client) RemoveIssueTag(ctx *YouTrackContext, issueID string, tagName string) error {
 	path := fmt.Sprintf("/api/issues/%s/tags/%s", issueID, tagName)
-	
+
 	resp, err := c.Delete(ctx, path)
 	if err != nil {
 		return err
@@ -81,7 +81,7 @@ func (c *Client) CreateTag(ctx *YouTrackContext, name string, color string) (*Ta
 	if color != "" {
 		req["color"] = color
 	}
-	
+
 	resp, err := c.Post(ctx, "/api/tags", req)
 	if err != nil {
 		return nil, err

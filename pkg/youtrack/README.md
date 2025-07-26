@@ -14,7 +14,7 @@ A stateless Go client library for the YouTrack REST API. This client provides a 
 ## Installation
 
 ```go
-import "mkozhukh/youtrack-mcp/youtrack"
+import "mkozhukh/youtrack/pkg/youtrack"
 ```
 
 ## Quick Start
@@ -27,7 +27,7 @@ import (
     "fmt"
     "log"
     
-    "mkozhukh/youtrack-mcp/youtrack"
+    "mkozhukh/youtrack/pkg/youtrack"
 )
 
 func main() {

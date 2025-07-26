@@ -80,6 +80,10 @@ func (c *Client) Post(ctx *YouTrackContext, path string, body interface{}) (*htt
 	return c.doRequest(ctx, http.MethodPost, path, nil, body)
 }
 
+func (c *Client) PostWithQuery(ctx *YouTrackContext, path string, query url.Values, body interface{}) (*http.Response, error) {
+	return c.doRequest(ctx, http.MethodPost, path, query, body)
+}
+
 func (c *Client) Put(ctx *YouTrackContext, path string, body interface{}) (*http.Response, error) {
 	return c.doRequest(ctx, http.MethodPut, path, nil, body)
 }

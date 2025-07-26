@@ -9,10 +9,10 @@ import (
 
 func (c *Client) GetUser(ctx *YouTrackContext, userID string) (*User, error) {
 	path := fmt.Sprintf("/api/users/%s", userID)
-	
+
 	query := url.Values{}
 	query.Add("fields", "id,login,fullName,email")
-	
+
 	resp, err := c.Get(ctx, path, query)
 	if err != nil {
 		return nil, err
@@ -63,7 +63,7 @@ func (c *Client) GetUserByLogin(ctx *YouTrackContext, login string) (*User, erro
 
 func (c *Client) GetProjectUsers(ctx *YouTrackContext, projectID string, skip, top int) ([]*User, error) {
 	path := fmt.Sprintf("/api/admin/projects/%s/users", projectID)
-	
+
 	params := url.Values{}
 	params.Add("$skip", fmt.Sprintf("%d", skip))
 	params.Add("$top", fmt.Sprintf("%d", top))
@@ -89,38 +89,70 @@ func (c *Client) SuggestUserByProject(ctx *YouTrackContext, projectID string, us
 	}
 
 	lowercaseUsername := strings.ToLower(username)
-	
+
 	// Get all users for the project with pagination
 	skip := 0
 	top := 100
-	
+
 	for {
 		users, err := c.GetProjectUsers(ctx, projectID, skip, top)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get project users: %w", err)
 		}
-		
+
 		if len(users) == 0 {
 			break
 		}
-		
+
 		// Search for matching user
 		for _, user := range users {
 			// Check if username matches any of the user fields (case-insensitive)
 			if strings.Contains(strings.ToLower(user.Login), lowercaseUsername) ||
-			   strings.Contains(strings.ToLower(user.FullName), lowercaseUsername) ||
-			   strings.Contains(strings.ToLower(user.Email), lowercaseUsername) {
+				strings.Contains(strings.ToLower(user.FullName), lowercaseUsername) ||
+				strings.Contains(strings.ToLower(user.Email), lowercaseUsername) {
 				return user, nil
 			}
 		}
-		
+
 		// If we got fewer results than requested, we've reached the end
 		if len(users) < top {
 			break
 		}
-		
+
 		skip += len(users)
 	}
-	
+
 	return nil, fmt.Errorf("no user found matching '%s' in project '%s'", username, projectID)
+}
+
+func (c *Client) GetUserWorklogs(ctx *YouTrackContext, userID string, projectID string, startDate, endDate string, skip, top int) ([]*WorkItem, error) {
+	path := fmt.Sprintf("/api/users/%s/timeTracking/workItems", userID)
+
+	params := url.Values{}
+	params.Add("$skip", fmt.Sprintf("%d", skip))
+	params.Add("$top", fmt.Sprintf("%d", top))
+	params.Add("fields", "id,date,duration,text,author(id,login,fullName,email),type(id,name),issue(idReadable,summary)")
+
+	if projectID != "" {
+		params.Add("project", projectID)
+	}
+	if startDate != "" {
+		params.Add("start", startDate)
+	}
+	if endDate != "" {
+		params.Add("end", endDate)
+	}
+
+	resp, err := c.Get(ctx, path, params)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var workItems []*WorkItem
+	if err := json.NewDecoder(resp.Body).Decode(&workItems); err != nil {
+		return nil, fmt.Errorf("failed to decode work items: %w", err)
+	}
+
+	return workItems, nil
 }

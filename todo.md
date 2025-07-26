@@ -1,231 +1,203 @@
-# YouTrack MCP Implementation Plan
+# YouTrack CLI Implementation Plan
+
+Full specification is at the spec/yt.md
+Existing REST client spec is at the spec/rest.md
 
 ## Overview
-Implementation of MCP operations for YouTrack integration, structured in modular phases. Each phase builds upon the previous one with clear deliverables and acceptance criteria.
 
-## Technical Architecture
+This document outlines the implementation plan for the `yt` CLI tool that interfaces with YouTrack's REST API.
 
-### Module Structure
+## Architecture
+
 ```
-mcp/
-├── handlers/          # MCP tool handlers
-│   ├── get_issue_list.go      # separate file for each tool, contains tool description and handler
-│   ├── get_issue_details.go   # same for other tool
-│   └── ...
-└── main.go            # MCP server initialization
+youtrack/
+├── cmd/yt/                    # CLI entry point
+│   └── main.go               # Main executable
+├── internal/yt/              # CLI implementation
+│   ├── config/              # Configuration management
+│   │   └── config.go        # Config loading with koanf
+│   ├── commands/            # Command implementations
+│   │   ├── root.go         # Root command setup
+│   │   ├── login.go        # Login command
+│   │   ├── completion.go   # Shell completion
+│   │   ├── projects.go     # Projects subcommands
+│   │   ├── tickets/        # Tickets subcommands
+│   │   │   ├── tickets.go  # Main tickets commands
+│   │   │   ├── comments.go # Comments management
+│   │   │   ├── attachments.go # Attachments management
+│   │   │   ├── worklogs.go # Worklogs management
+│   │   │   ├── links.go    # Links management
+│   │   │   └── history.go  # History/activity stream
+│   │   └── users.go        # Users subcommands
+│   └── output/              # Output formatting
+│       └── formatter.go     # Text/JSON formatters
+└── pkg/youtrack/           # REST API client
+    ├── client.go           # HTTP client
+    ├── types.go            # Data structures
+    ├── projects.go         # Projects API
+    ├── issues.go           # Issues/Tickets API
+    ├── comments.go         # Comments API
+    ├── attachments.go      # Attachments API
+    ├── worklogs.go         # Worklogs API
+    ├── users.go            # Users API
+    └── tags.go             # Tags API
 ```
 
-### Configuration Extensions
-- YouTrack API URL
-- YouTrack API key
-- Default project ID
-- Default query parameters
-- Timeout settings
+## Implementation Steps
 
----
+### Phase 1: Foundation (High Priority)
 
-## Phase 1: Foundation & Configuration
-**Goal**: Establish core infrastructure and YouTrack client integration
+#### 1. Directory Structure **done**
+**Expected Result:** Basic project structure created with all necessary directories.
 
-### Tasks
-1. **Create mcp package structure**
-   - Create subdirectory: `handlers/`
-   - Create `mcp/server.go` for MCP server initialization
+#### 2. Configuration Management **done**
+**Implementation:** 
+- Use koanf for configuration loading
+- Support TOML files, environment variables, and CLI flags
+- Default config path: `~/.config/yt/config.toml`
+- Environment variables prefixed with `YT_`
+- Config includes: server.url, server.token, defaults.project, defaults.user_id
 
-2. **Extend configuration**
-   - Add YouTrack section to `Config` struct
-   - Add required fields: `base_url`, `api_key`, `default_project`, `timeout`
-   - Update `config.toml` with YouTrack configuration section
-   - Update environment variable handling
+**Expected Result:** 
+- Config struct defined with server URL, token, and defaults
+- Config loading from file, env, and CLI with proper precedence
+- Global `--config` flag working
 
-3. **Create YouTrack client wrapper**
-   - Initialize YouTrack client from configuration
-   - Create context wrapper for API calls
-   - Add error handling and validation
+#### 3. Login Command **done**
+**Command:** `yt login`
+**Implementation:**
+- Interactive prompts for YouTrack URL and permanent token
+- Verify connection and authenticate
+- Automatically determine and save user's ID
+- Save credentials to config file
 
-### Acceptance Criteria
-- [ ] MCP package structure exists
-- [ ] Configuration loads YouTrack settings
-- [ ] YouTrack client initializes successfully
-- [ ] Basic error handling implemented
-- [ ] Code compiles and runs without errors
+**Expected Result:**
+- User can configure authentication interactively
+- Connection is verified during login
+- User ID is auto-detected and saved
 
----
+### Phase 2: Core Commands (Medium Priority)
 
-## Phase 2: Issue Operations (Core)
-**Goal**: Implement primary issue management operations
+#### 4. Projects Commands **done**
+**Commands:** `yt projects list`, `yt projects describe <id>`
+**Expected Result:**
+- List all projects with optional query filter
+- Show detailed project information including custom fields, statuses, and types
+- Proper error handling for missing projects
+- Support alias `yt projects` for list command
 
-### Tasks
-1. **get_issue_list tool**
-   - Create `mcp/tools/issue_tools.go` with tool definition
-   - Create `mcp/handlers/issues.go` with handler implementation
-   - Parameters: `project_id`, `query` (optional), `max_results` (optional)
-   - Use `client.SearchIssues()` for implementation
-   - Handle pagination if needed
+#### 5. Tickets List & Show **done**
+**Commands:** `yt tickets list`, `yt tickets show <id>`
+**Expected Result:**
+- List tickets with project filter, limit, and query
+- Support `--user` filter (defaults to current user from config)
+- Show detailed ticket information
+- Default to configured project when not specified
+- Support alias `yt tickets` for list command
+- Validate ticket ID format (e.g., "PRJ-123")
 
-2. **get_issue_details tool**
-   - Add tool definition to `issue_tools.go`
-   - Add handler to `issues.go`
-   - Parameters: `issue_id`
-   - Use `client.GetIssue()` and `client.GetIssueComments()`
-   - Format response with issue details and comments
+#### 6. Tickets Create **done**
+**Command:** `yt tickets create`
+**Expected Result:**
+- Create tickets with title, description, assignee
+- Support custom fields via `--field` flag
+- Return created ticket ID
 
-3. **create_issue tool**
-   - Add tool definition to `issue_tools.go`
-   - Add handler to `issues.go`
-   - Parameters: `project_id`, `summary`, `description` (optional)
-   - Use `client.CreateIssue()` for implementation
-   - Return created issue details
+#### 7. Tickets Update **done**
+**Command:** `yt tickets update <id>`
+**Expected Result:**
+- Update status, assignee, and custom fields
+- Partial updates (only specified fields)
+- Confirmation of changes
 
-4. **update_issue tool**
-   - Add tool definition to `issue_tools.go`
-   - Add handler to `issues.go`
-   - Parameters: `issue_id`, `state` (optional), `assignee` (optional)
-   - Use `client.UpdateIssue()` and `client.UpdateIssueAssigneeByProject()` for implementation
-   - Handle state and assignee updates separately
+#### 8. Tickets Tag Management **done**
+**Commands:** `yt tickets tag <id> <tags...>`, `yt tickets untag <id> <tags...>`
+**Expected Result:**
+- Add multiple tags in one command
+- Remove specific tags
+- Handle non-existent tags gracefully
 
-### Acceptance Criteria
-- [ ] All 4 issue tools are defined and registered
-- [ ] Handlers process parameters correctly
-- [ ] YouTrack API calls work with real data
-- [ ] Error handling covers common scenarios
-- [ ] Tools return properly formatted responses
-- [ ] Integration tests pass with real YouTrack instance
+#### 9. Users Commands **done**
+**Commands:** `yt users list`, `yt users worklogs <user>`
+**Expected Result:**
+- List project team members
+- Show worklogs with date filtering
+- Support project filter for worklogs
+- Support alias `yt users` for list command
+- Accept username or email for user identification
+- Implement partial matching for user lookups
 
----
+### Phase 3: Advanced Commands (Low Priority)
 
-## Phase 3: Tag Operations
-**Goal**: Implement tag management functionality
+#### 10. Tickets Comments **done**
+**Commands:** `yt tickets comments list <id>`, `yt tickets comments add <id>`
+**Expected Result:**
+- List all comments for a ticket
+- Add new comment with `--message` flag
 
-### Tasks
-1. **tag_issue tool**
-   - Create `mcp/tools/tag_tools.go` with tool definition
-   - Create `mcp/handlers/tags.go` with handler implementation
-   - Parameters: `issue_id`, `tag`
-   - Use `client.EnsureTag()` to create tag if needed
-   - Use `client.AddIssueTag()` to apply tag to issue
+#### 11. Tickets Attachments **done**
+**Commands:** `yt tickets attachments list <id>`, `yt tickets attachments add <id> <file>`
+**Expected Result:**
+- List all attachments for a ticket
+- Upload file as attachment
 
-### Acceptance Criteria
-- [ ] Tag tool is defined and registered
-- [ ] Handler creates tags if they don't exist
-- [ ] Tags are successfully applied to issues
-- [ ] Error handling covers tag creation failures
-- [ ] Integration tests pass
+#### 12. Tickets Worklogs **done**
+**Commands:** `yt tickets worklogs list <id>`, `yt tickets worklogs add <id>`
+**Expected Result:**
+- List worklog entries for a ticket
+- Add worklog with duration and optional description
 
----
+#### 13. Tickets Links **done**
+**Command:** `yt tickets links add <id> <other_id>`
+**Expected Result:**
+- Link two tickets with specified relation type
 
-## Phase 4: Comment Operations
-**Goal**: Implement comment management functionality
+#### 14. Tickets History **done**
+**Command:** `yt tickets history <id>`
+**Expected Result:**
+- Show activity stream (field changes, comments, etc.)
 
-### Tasks
-1. **add_comment tool**
-   - Create `mcp/tools/comment_tools.go` with tool definition
-   - Create `mcp/handlers/comments.go` with handler implementation
-   - Parameters: `issue_id`, `comment`
-   - Use `client.AddIssueComment()` for implementation
-   - Return created comment details
+#### 15. Shell Completion **done**
+**Command:** `yt completion <shell>`
+**Expected Result:**
+- Generate completion scripts for bash/zsh
 
-### Acceptance Criteria
-- [ ] Comment tool is defined and registered
-- [ ] Handler adds comments successfully
-- [ ] Error handling covers comment creation failures
-- [ ] Integration tests pass
+## Testing Strategy
 
----
+- do not implement tests
 
-## Phase 5: Integration & Testing
-**Goal**: Complete integration and comprehensive testing
+## Output format
 
-### Tasks
-1. **Main.go integration**
-   - Remove example hello_world tool
-   - Register all YouTrack tools
+For all commands be sure to support the global `--output` flag, so each command need to provide text ( human redable ) and json ( just serialization of result ) outputs
 
-2. **Error handling enhancement**
-   - Implement consistent error formatting
-   - Add validation for required parameters
-   - Handle YouTrack API errors gracefully
+Prefer readable output with consistent light formatting and color usage
 
-3. **Tool call logging**
-   - Integrate tool call logging with existing logging system
-   - Add structured logging for all operations
+## Error Handling
 
-4. **Documentation update**
-   - Update README with tool usage examples
-   - Add configuration examples
-   - Document required YouTrack permissions
+- Log errors and exit on failure
+- For user input errors: provide readable error messages to help users fix the issue
+- For network/server errors: display the raw error without custom messages
+- Server error responses are logged at INFO level (visible with `--verbose`)
 
-### Acceptance Criteria
-- [ ] All tools are registered and working
-- [ ] Error handling is consistent across all tools
-- [ ] Tool call logging works correctly
-- [ ] Documentation is complete and accurate
-- [ ] Manual testing passes for all operations
+## Logging
 
----
+do not overuse logging, user expect to receive the command output, not the process log
 
-## Phase 6: Advanced Features & Optimization
-**Goal**: Add advanced features and optimize performance
+- log all errors with log.Error 
+- if there is some minor error, which doesn't prevent normal command output - use log.Warn
+- add log.Info for all rest API calls and server error responses
 
-### Tasks
-1. **Query optimization**
-   - Implement smart defaults for issue queries
-
-2. **Response formatting**
-   - Implement consistent response formatting
-   - Include relevant metadata in responses
-
-3. **Configuration validation**
-   - Add startup validation for YouTrack connectivity
-
-4. **Performance monitoring**
-   - Add health check endpoint
-
-### Acceptance Criteria
-- [ ] Responses are well-formatted and readable
-- [ ] Configuration validation prevents startup issues
-- [ ] System is production-ready
-
----
+set default log level to Warn
 
 ## Implementation Notes
 
-### Configuration Example
-```toml
-[youtrack]
-# YouTrack instance base URL
-base_url = "https://youtrack.example.com"
+### User Identification
+- Accept username or email for user-related parameters
+- Implement partial matching for user lookups
 
-# YouTrack API key (can be set via YOUTRACK_API_KEY env var)
-api_key = "your_api_key_here"
+### Ticket ID Validation
+- Validate ticket ID format (e.g., "PRJ-123") before making API calls
 
-# Default project ID for operations
-default_project = "PROJ"
-
-# API timeout in seconds
-timeout = 30
-
-# Default query for issue listing
-default_query = "updated: -7d"
-
-# Default max results for issue listing
-default_max_results = 10
-```
-
-### Error Handling Strategy
-- Validate all input parameters
-- Handle YouTrack API errors gracefully
-- Provide meaningful error messages
-- Log errors for debugging
-- Return consistent error format
-
-### Testing Strategy
-- Skip tests for now
-
----
-
-## Success Metrics
-- All 6 MCP tools implemented and working
-- Code follows Go best practices and project conventions
-- Documentation is complete and helpful
-- Error handling is robust and user-friendly
+### Field Handling
+- Custom fields use simple key=value format
+- More complex field types will be addressed as practical use cases arise
