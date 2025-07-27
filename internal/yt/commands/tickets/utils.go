@@ -3,6 +3,7 @@ package tickets
 import (
 	"encoding/json"
 	"fmt"
+	"mkozhukh/youtrack/pkg/youtrack"
 	"os"
 	"regexp"
 	"strconv"
@@ -54,12 +55,12 @@ func outputJSON(data interface{}) error {
 }
 
 // parseCustomFields parses key=value pairs from the --field flags
-func parseCustomFields(fields []string) (map[string]interface{}, error) {
+func parseCustomFields(fields []string) ([]youtrack.CustomField, error) {
 	if len(fields) == 0 {
 		return nil, nil
 	}
 
-	customFields := make(map[string]interface{})
+	customFields := make([]youtrack.CustomField, 0, len(fields))
 	for _, field := range fields {
 		parts := strings.SplitN(field, "=", 2)
 		if len(parts) != 2 {
@@ -73,9 +74,38 @@ func parseCustomFields(fields []string) (map[string]interface{}, error) {
 			return nil, fmt.Errorf("empty field key in: %s", field)
 		}
 
-		// For now, treat all custom field values as strings
-		// More complex field types can be handled later
-		customFields[key] = value
+		if strings.Contains(key, "|") {
+			parts := strings.SplitN(key, "|", 2)
+			if len(parts) != 2 {
+				return nil, fmt.Errorf("invalid field format: %s (expected key|value)", field)
+			}
+			key = parts[0]
+			keyType := parts[1]
+
+			switch keyType {
+			case "SingleEnumIssueCustomField":
+			case "enum":
+				customFields = append(customFields, youtrack.CustomField{
+					Name:  key,
+					Type:  "SingleEnumIssueCustomField",
+					Value: youtrack.SingleValue{Value: value},
+				})
+			default:
+				customFields = append(customFields, youtrack.CustomField{
+					Name:  key,
+					Type:  keyType,
+					Value: value,
+				})
+			}
+
+			continue
+		}
+
+		customFields = append(customFields, youtrack.CustomField{
+			Name:  key,
+			Type:  "SimpleIssueCustomField",
+			Value: value,
+		})
 	}
 
 	return customFields, nil

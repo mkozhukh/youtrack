@@ -245,8 +245,6 @@ func init() {
 	createTicketCmd.MarkFlagRequired("title")
 
 	// Add flags for update command
-	updateTicketCmd.Flags().StringVar(&updateStatus, "status", "", "Change the ticket's status")
-	updateTicketCmd.Flags().StringVar(&updateAssignee, "assignee", "", "Change the assignee")
 	updateTicketCmd.Flags().StringSliceVar(&updateFields, "field", []string{}, "Set a custom field (key=value format). Can be specified multiple times")
 
 	// Add flags for comment add command

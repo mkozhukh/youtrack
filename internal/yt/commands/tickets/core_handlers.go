@@ -31,7 +31,7 @@ func listTickets(cmd *cobra.Command, args []string) error {
 	}
 
 	// Use default user if not specified
-	if userID == "" {
+	if userID == ":me" {
 		userID = cfg.Defaults.UserID
 	}
 
@@ -171,8 +171,8 @@ func updateTicket(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check if at least one update field is provided
-	if updateStatus == "" && updateAssignee == "" && len(updateFields) == 0 {
-		return fmt.Errorf("at least one update field must be specified (--status, --assignee, or --field)")
+	if len(updateFields) == 0 {
+		return fmt.Errorf("at least one update field must be specified (--field)")
 	}
 
 	// Parse custom fields
@@ -192,21 +192,8 @@ func updateTicket(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get original ticket %s: %w", ticketID, err)
 	}
 
-	// Handle status update by adding it to custom fields
-	if updateStatus != "" {
-		if customFields == nil {
-			customFields = make(map[string]interface{})
-		}
-		customFields["State"] = updateStatus
-	}
-
 	// Build update request
 	req := &youtrack.UpdateIssueRequest{}
-
-	// Set assignee if specified
-	if updateAssignee != "" {
-		req.Assignee = &updateAssignee
-	}
 
 	// Set custom fields if any
 	if customFields != nil {
@@ -232,19 +219,8 @@ func updateTicket(cmd *cobra.Command, args []string) error {
 	}
 
 	// Track what was changed
-	if updateStatus != "" {
-		summary.StatusChanged = updateStatus
-	}
-	if updateAssignee != "" {
-		summary.AssigneeChanged = updateAssignee
-	}
 	if len(updateFields) > 0 {
-		for _, field := range updateFields {
-			parts := strings.SplitN(field, "=", 2)
-			if len(parts) == 2 {
-				summary.FieldsChanged = append(summary.FieldsChanged, parts[0])
-			}
-		}
+		summary.FieldsChanged = append(summary.FieldsChanged, updateFields...)
 	}
 
 	// Output results

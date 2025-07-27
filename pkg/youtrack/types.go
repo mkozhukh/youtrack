@@ -67,18 +67,32 @@ type IssueComment struct {
 type ProjectRef struct {
 	ID string `json:"shortName"`
 }
+
+type CustomField struct {
+	Name  string      `json:"name"`
+	Type  string      `json:"$type"`
+	Value interface{} `json:"value"`
+}
+
+type SingleValue struct {
+	Value interface{} `json:"name"`
+}
+
+type SingleUserValue struct {
+	ID string `json:"login"`
+}
+
 type CreateIssueRequest struct {
-	Project     ProjectRef             `json:"project"`
-	Summary     string                 `json:"summary"`
-	Description string                 `json:"description,omitempty"`
-	Fields      map[string]interface{} `json:"customFields,omitempty"`
+	Project     ProjectRef    `json:"project"`
+	Summary     string        `json:"summary"`
+	Description string        `json:"description,omitempty"`
+	Fields      []CustomField `json:"customFields,omitempty"`
 }
 
 type UpdateIssueRequest struct {
-	Summary     *string                `json:"summary,omitempty"`
-	Description *string                `json:"description,omitempty"`
-	Assignee    *string                `json:"assignee,omitempty"`
-	Fields      map[string]interface{} `json:"customFields,omitempty"`
+	Summary     *string       `json:"summary,omitempty"`
+	Description *string       `json:"description,omitempty"`
+	Fields      []CustomField `json:"customFields,omitempty"`
 }
 
 type SearchIssuesRequest struct {

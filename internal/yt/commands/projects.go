@@ -212,16 +212,12 @@ func formatProjectsList(projects []*youtrack.Project) error {
 		return nil
 	}
 
+	cellStyle := lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.Color("246"))
 	t := table.New().
 		Border(lipgloss.NormalBorder()).
 		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("99"))).
 		StyleFunc(func(row, col int) lipgloss.Style {
-			switch {
-			case row == 0:
-				return lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Bold(true)
-			default:
-				return lipgloss.NewStyle().Foreground(lipgloss.Color("246"))
-			}
+			return cellStyle
 		}).
 		Headers("ID", "NAME", "SHORT NAME", "DESCRIPTION")
 

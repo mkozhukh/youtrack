@@ -69,7 +69,13 @@ func (c *Client) UpdateIssueAssignee(ctx *YouTrackContext, issueID string, assig
 	}
 
 	req := &UpdateIssueRequest{
-		Assignee: &user.ID,
+		Fields: []CustomField{
+			{
+				Name:  "Assignee",
+				Type:  "SingleUserIssueCustomField",
+				Value: SingleUserValue{ID: user.ID},
+			},
+		},
 	}
 
 	return c.UpdateIssue(ctx, issueID, req)
@@ -82,7 +88,13 @@ func (c *Client) UpdateIssueAssigneeByProject(ctx *YouTrackContext, issueID stri
 	}
 
 	req := &UpdateIssueRequest{
-		Assignee: &user.ID,
+		Fields: []CustomField{
+			{
+				Name:  "Assignee",
+				Type:  "SingleUserIssueCustomField",
+				Value: SingleUserValue{ID: user.ID},
+			},
+		},
 	}
 
 	return c.UpdateIssue(ctx, issueID, req)
