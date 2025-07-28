@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"mkozhukh/youtrack/internal/mcp/handlers"
-	"mkozhukh/youtrack/internal/mcp/tools"
+	"github.com/mkozhukh/youtrack/internal/mcp/handlers"
+	"github.com/mkozhukh/youtrack/internal/mcp/tools"
 
 	"github.com/charmbracelet/log"
 	"github.com/mark3labs/mcp-go/server"

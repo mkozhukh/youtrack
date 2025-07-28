@@ -3,11 +3,12 @@ package tickets
 import (
 	"encoding/json"
 	"fmt"
-	"mkozhukh/youtrack/pkg/youtrack"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/mkozhukh/youtrack/pkg/youtrack"
 
 	"github.com/spf13/cobra"
 )

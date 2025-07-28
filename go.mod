@@ -1,4 +1,4 @@
-module mkozhukh/youtrack
+module github.com/mkozhukh/youtrack
 
 go 1.23.1
 

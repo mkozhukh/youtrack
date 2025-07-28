@@ -1,6 +1,6 @@
 package tickets
 
-import "mkozhukh/youtrack/pkg/youtrack"
+import "github.com/mkozhukh/youtrack/pkg/youtrack"
 
 // UpdateSummary contains information about what was changed in a ticket update
 type UpdateSummary struct {

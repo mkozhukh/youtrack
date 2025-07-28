@@ -1,7 +1,7 @@
 package main
 
 import (
-	"mkozhukh/youtrack/internal/yt/commands"
+	"github.com/mkozhukh/youtrack/internal/yt/commands"
 )
 
 func main() {

@@ -12,8 +12,8 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"mkozhukh/youtrack/internal/yt/config"
-	"mkozhukh/youtrack/pkg/youtrack"
+	"github.com/mkozhukh/youtrack/internal/yt/config"
+	"github.com/mkozhukh/youtrack/pkg/youtrack"
 )
 
 // loginCmd represents the login command

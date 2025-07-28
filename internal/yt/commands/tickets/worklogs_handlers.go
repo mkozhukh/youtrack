@@ -7,8 +7,8 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
 
-	"mkozhukh/youtrack/internal/yt/config"
-	"mkozhukh/youtrack/pkg/youtrack"
+	"github.com/mkozhukh/youtrack/internal/yt/config"
+	"github.com/mkozhukh/youtrack/pkg/youtrack"
 )
 
 // listWorklogs handles the list worklogs command

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"mkozhukh/youtrack/pkg/youtrack"
+	"github.com/mkozhukh/youtrack/pkg/youtrack"
 
 	"github.com/charmbracelet/log"
 	"github.com/mark3labs/mcp-go/mcp"

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"mkozhukh/youtrack/pkg/youtrack"
+	"github.com/mkozhukh/youtrack/pkg/youtrack"
 )
 
 // HealthHandlers manages health check operations

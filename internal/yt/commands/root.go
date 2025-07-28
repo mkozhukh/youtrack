@@ -8,7 +8,7 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
 
-	"mkozhukh/youtrack/internal/yt/commands/tickets"
+	"github.com/mkozhukh/youtrack/internal/yt/commands/tickets"
 )
 
 var (

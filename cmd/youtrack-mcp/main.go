@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"mkozhukh/youtrack/internal/mcp"
+	"github.com/mkozhukh/youtrack/internal/mcp"
 
 	"github.com/charmbracelet/log"
 	"github.com/knadh/koanf/parsers/toml"

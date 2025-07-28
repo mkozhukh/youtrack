@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"mkozhukh/youtrack/pkg/youtrack"
+	"github.com/mkozhukh/youtrack/pkg/youtrack"
 
 	"github.com/mark3labs/mcp-go/mcp"
 )
