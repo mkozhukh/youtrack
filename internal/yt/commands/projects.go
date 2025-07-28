@@ -133,11 +133,7 @@ func describeProject(cmd *cobra.Command, args []string) error {
 		Project:      project,
 		CustomFields: customFields,
 	}
-
-	// Output results
-	return outputResult(detailedProject, func(data interface{}) error {
-		return formatProjectDetails(data)
-	})
+	return outputResult(detailedProject, formatProjectDetails)
 }
 
 // fetchAllProjects retrieves all projects from YouTrack
