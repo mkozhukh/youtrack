@@ -1,0 +1,46 @@
+[server]
+# MCP server configuration
+port = 3204
+name = "YouTrack MCP Server"
+
+[logging]
+# Enable structured logging to files
+enabled = true
+# Call log: tracks usage patterns (tool calls and REST requests with timing)
+call_log_path = "calls.log"
+# REST error log: tracks REST API failures for debugging
+rest_error_log_path = "rest_errors.log"
+# Tool error log: tracks tool handler errors for debugging
+tool_error_log_path = "tool_errors.log"
+
+[youtrack]
+# YouTrack instance base URL
+base_url = "https://youtrack.example.com"
+
+# YouTrack API key (can be set via YOUTRACK_YOUTRACK_API_KEY env var)
+api_key = "your_api_key_here"
+
+# Default project ID for operations
+default_project = "PROJ"
+
+# API timeout in seconds
+timeout = 30
+
+# Default query for issue listing
+default_query = "updated: -7d"
+
+# Default max results for issue listing
+max_results = 10
+
+[cache]
+# Cache TTL in seconds for project metadata (custom fields, users)
+ttl_seconds = 300
+
+[tracker]
+# File path for storing last used project per user
+file_path = "projects.json"
+
+[tools]
+# Blacklist tools by name to prevent them from being registered
+# Example: blacklist = ["delete_issue", "untag_issue"]
+blacklist = []

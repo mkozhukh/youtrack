@@ -1,13 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/mkozhukh/youtrack/internal/mcp"
+	"github.com/mkozhukh/youtrack/internal/mcp/logging"
 
 	"github.com/charmbracelet/log"
 	"github.com/knadh/koanf/parsers/toml"
@@ -25,9 +25,14 @@ type Config struct {
 		Name string `koanf:"name"`
 	} `koanf:"server"`
 	Logging struct {
-		LogToolCalls  bool   `koanf:"log_tool_calls"`
-		ToolCallsFile string `koanf:"tool_calls_file"`
+		Enabled          bool   `koanf:"enabled"`
+		CallLogPath      string `koanf:"call_log_path"`
+		RESTErrorLogPath string `koanf:"rest_error_log_path"`
+		ToolErrorLogPath string `koanf:"tool_error_log_path"`
 	} `koanf:"logging"`
+	Tools struct {
+		Blacklist []string `koanf:"blacklist"`
+	} `koanf:"tools"`
 	YouTrack struct {
 		BaseURL        string `koanf:"base_url"`
 		APIKey         string `koanf:"api_key"`
@@ -36,12 +41,17 @@ type Config struct {
 		DefaultQuery   string `koanf:"default_query"`
 		MaxResults     int    `koanf:"max_results"`
 	} `koanf:"youtrack"`
+	Cache struct {
+		TTLSeconds int `koanf:"ttl_seconds"`
+	} `koanf:"cache"`
+	Tracker struct {
+		FilePath string `koanf:"file_path"`
+	} `koanf:"tracker"`
 }
 
 var (
-	k             = koanf.New(".")
-	config        Config
-	toolCallsFile *os.File
+	k      = koanf.New(".")
+	config Config
 )
 
 func main() {
@@ -66,16 +76,20 @@ func main() {
 func loadConfig() error {
 	// Load defaults
 	defaults := map[string]interface{}{
-		"server.port":              3204,
-		"server.name":              "YouTrack MCP Server",
-		"logging.log_tool_calls":   false,
-		"logging.tool_calls_file":  "tool_calls.log",
-		"youtrack.base_url":        "",
-		"youtrack.api_key":         "",
-		"youtrack.default_project": "",
-		"youtrack.timeout":         30,
-		"youtrack.default_query":   "updated: -7d",
-		"youtrack.max_results":     10,
+		"server.port":                 3204,
+		"server.name":                 "YouTrack MCP Server",
+		"logging.enabled":             false,
+		"logging.call_log_path":       "calls.log",
+		"logging.rest_error_log_path": "rest_errors.log",
+		"logging.tool_error_log_path": "tool_errors.log",
+		"youtrack.base_url":           "",
+		"youtrack.api_key":            "",
+		"youtrack.default_project":    "",
+		"youtrack.timeout":            30,
+		"youtrack.default_query":      "updated: -7d",
+		"youtrack.max_results":        10,
+		"cache.ttl_seconds":           300,
+		"tracker.file_path":           "projects.json",
 	}
 
 	if err := k.Load(confmap.Provider(defaults, "."), nil); err != nil {
@@ -119,17 +133,6 @@ func run(cmd *cobra.Command, args []string, useHTTP bool) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// Setup tool call logging if enabled
-	if config.Logging.LogToolCalls {
-		var err error
-		toolCallsFile, err = os.OpenFile(config.Logging.ToolCallsFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-		if err != nil {
-			return fmt.Errorf("failed to open tool calls log file: %w", err)
-		}
-		defer toolCallsFile.Close()
-		log.Info("Tool call logging enabled", "file", config.Logging.ToolCallsFile)
-	}
-
 	// Create server configuration
 	serverConfig := mcp.ServerConfig{
 		Name: config.Server.Name,
@@ -142,6 +145,19 @@ func run(cmd *cobra.Command, args []string, useHTTP bool) error {
 			DefaultQuery:   config.YouTrack.DefaultQuery,
 			MaxResults:     config.YouTrack.MaxResults,
 		},
+		Cache: mcp.CacheConfig{
+			TTL: time.Duration(config.Cache.TTLSeconds) * time.Second,
+		},
+		Tracker: mcp.TrackerConfig{
+			FilePath: config.Tracker.FilePath,
+		},
+		Logging: logging.LogConfig{
+			Enabled:          config.Logging.Enabled,
+			CallLogPath:      config.Logging.CallLogPath,
+			RESTErrorLogPath: config.Logging.RESTErrorLogPath,
+			ToolErrorLogPath: config.Logging.ToolErrorLogPath,
+		},
+		ToolBlacklist: config.Tools.Blacklist,
 	}
 
 	// Create a new MCP server with YouTrack integration
@@ -172,30 +188,6 @@ func run(cmd *cobra.Command, args []string, useHTTP bool) error {
 }
 
 func logToolCall(toolName string, args map[string]interface{}) {
-	// Log tool call to normal log with structured fields
-	log.Info("Tool call executed",
-		"tool", toolName,
-		"args", args,
-		"timestamp", time.Now().Format("2006-01-02 15:04:05"),
-		"user_agent", "MCP",
-	)
-
-	// Log to file if enabled with JSON format for better parsing
-	if config.Logging.LogToolCalls && toolCallsFile != nil {
-		logData := map[string]interface{}{
-			"timestamp": time.Now().Format("2006-01-02 15:04:05"),
-			"tool":      toolName,
-			"args":      args,
-		}
-
-		// Format as JSON for structured logging
-		if jsonData, err := json.Marshal(logData); err == nil {
-			toolCallsFile.WriteString(string(jsonData) + "\n")
-		} else {
-			// Fallback to simple format
-			logEntry := fmt.Sprintf("[%s] Tool: %s, Args: %v\n",
-				time.Now().Format("2006-01-02 15:04:05"), toolName, args)
-			toolCallsFile.WriteString(logEntry)
-		}
-	}
+	// Log tool call to console
+	log.Info("Tool call", "tool", toolName, "args", args)
 }

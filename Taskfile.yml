@@ -1,0 +1,17 @@
+version: '3'
+
+tasks:
+  build:
+    cmds:
+      - go build -o youtrack-mcp ./cmd/youtrack-mcp
+      - go build -o yt ./cmd/yt
+    silent: true
+
+  mcp:
+    cmds:
+      - ./youtrack-mcp --http
+    silent: true
+
+  clean:
+    cmds:
+      - rm -f youtrack-mcp yt

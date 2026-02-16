@@ -7,6 +7,24 @@ import (
 	"strings"
 )
 
+func (c *Client) GetCurrentUser(ctx *YouTrackContext) (*User, error) {
+	query := url.Values{}
+	query.Add("fields", "id,login,fullName,email")
+
+	resp, err := c.Get(ctx, "/api/users/me", query)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
+		return nil, fmt.Errorf("failed to decode current user: %w", err)
+	}
+
+	return &user, nil
+}
+
 func (c *Client) GetUser(ctx *YouTrackContext, userID string) (*User, error) {
 	path := fmt.Sprintf("/api/users/%s", userID)
 

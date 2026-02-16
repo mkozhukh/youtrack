@@ -7,7 +7,7 @@ import (
 // GetIssueListTool returns the MCP tool definition for listing issues
 func GetIssueListTool() mcp.Tool {
 	return mcp.NewTool("get_issue_list",
-		mcp.WithDescription("Retrieve a list of issues from YouTrack with optional filtering"),
+		mcp.WithDescription("Retrieve a list of issues from YouTrack with optional filtering and sorting"),
 		mcp.WithString("project_id",
 			mcp.Required(),
 			mcp.Description("Project ID to search issues in"),
@@ -17,6 +17,12 @@ func GetIssueListTool() mcp.Tool {
 		),
 		mcp.WithNumber("max_results",
 			mcp.Description("Maximum number of results to return (optional, defaults to config value)"),
+		),
+		mcp.WithString("sort_by",
+			mcp.Description("Field to sort by, e.g. 'created', 'updated', 'priority' (optional)"),
+		),
+		mcp.WithString("sort_order",
+			mcp.Description("Sort order: 'asc' or 'desc' (optional, defaults to 'desc')"),
 		),
 	)
 }
@@ -46,6 +52,17 @@ func CreateIssueTool() mcp.Tool {
 		),
 		mcp.WithString("description",
 			mcp.Description("Issue description (optional)"),
+		),
+	)
+}
+
+// DeleteIssueTool returns the MCP tool definition for deleting issues
+func DeleteIssueTool() mcp.Tool {
+	return mcp.NewTool("delete_issue",
+		mcp.WithDescription("Delete an issue from YouTrack"),
+		mcp.WithString("issue_id",
+			mcp.Required(),
+			mcp.Description("Issue ID to delete"),
 		),
 	)
 }

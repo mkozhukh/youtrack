@@ -114,14 +114,14 @@ Creates a new ticket in a project.
 
 #### `yt tickets update <ticket_id>`
 
-Updates fields of a specific ticket.
+Updates fields of a specific ticket. Only specified fields are updated (partial updates).
 
 -   **Arguments:**
     -   `<ticket_id>`: The full ID of the ticket to update. (Required)
 -   **Options:**
-    -   `--status <STATUS>`: Change the ticket's status.
-    -   `--assignee <USER>`: Change the assignee.
-    -   `--field "<KEY>=<VALUE>"`: Set a custom field. Can be specified multiple times.
+    -   `--field "<KEY>=<VALUE>"`: Set a custom field (key=value format). Can be specified multiple times.
+
+Note: Use field names like `State=Done`, `Assignee=john.doe`, `Priority=Critical`.
 
 #### `yt tickets tag <ticket_id> <tag_name...>`
 
@@ -211,7 +211,7 @@ Links two tickets together.
     -   `<ticket_id>`: The full ID of the source ticket. (Required)
     -   `<other_ticket_id>`: The full ID of the target ticket. (Required)
 -   **Options:**
-    -   `--relation <RELATION>`, `-r <RELATION>`: The relationship type (e.g., "relates to", "is duplicated by"). (Required)
+    -   `--type <TYPE>`: The relationship type (e.g., "relates to", "is duplicated by"). Default: "relates to".
 
 ### `yt tickets history`
 

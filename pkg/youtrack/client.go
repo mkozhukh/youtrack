@@ -10,9 +10,21 @@ import (
 	"time"
 )
 
+// RESTLogger is the interface for logging REST calls
+type RESTLogger interface {
+	LogRESTCall(method, path string, duration time.Duration)
+	LogRESTError(method, path string, body interface{}, statusCode int, errMsg string)
+}
+
 type Client struct {
 	baseURL    string
 	httpClient *http.Client
+	logger     RESTLogger
+}
+
+// SetLogger sets the REST logger for the client
+func (c *Client) SetLogger(logger RESTLogger) {
+	c.logger = logger
 }
 
 func NewClient(baseURL string) *Client {
@@ -25,6 +37,8 @@ func NewClient(baseURL string) *Client {
 }
 
 func (c *Client) doRequest(ctx *YouTrackContext, method, path string, query url.Values, body interface{}) (*http.Response, error) {
+	start := time.Now()
+
 	u, err := url.Parse(c.baseURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid base URL: %w", err)
@@ -56,16 +70,30 @@ func (c *Client) doRequest(ctx *YouTrackContext, method, path string, query url.
 	}
 
 	resp, err := c.httpClient.Do(req)
+	duration := time.Since(start)
+
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
+	}
+
+	// Log successful REST call
+	if c.logger != nil {
+		c.logger.LogRESTCall(method, path, duration)
 	}
 
 	if resp.StatusCode >= 400 {
 		defer resp.Body.Close()
 		bodyBytes, _ := io.ReadAll(resp.Body)
+		errMsg := string(bodyBytes)
+
+		// Log REST error
+		if c.logger != nil {
+			c.logger.LogRESTError(method, path, body, resp.StatusCode, errMsg)
+		}
+
 		return nil, &APIError{
 			StatusCode: resp.StatusCode,
-			Message:    string(bodyBytes),
+			Message:    errMsg,
 		}
 	}
 

@@ -1,27 +1,54 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
+	"github.com/mkozhukh/youtrack/internal/mcp/logging"
 	"github.com/mkozhukh/youtrack/pkg/youtrack"
 
 	"github.com/charmbracelet/log"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
+// AuthChecker interface for checking authentication
+type AuthChecker interface {
+	HasValidAuth(ctx context.Context) bool
+}
+
 // ErrorHandler provides consistent error handling and formatting
-type ErrorHandler struct{}
+type ErrorHandler struct {
+	logger   *logging.AppLogger
+	keyHash  string
+	toolName string
+	params   map[string]interface{}
+}
 
 // NewErrorHandler creates a new error handler
 func NewErrorHandler() *ErrorHandler {
 	return &ErrorHandler{}
 }
 
+// NewErrorHandlerWithContext creates a new error handler with logging context
+func NewErrorHandlerWithContext(logger *logging.AppLogger, keyHash, toolName string, params map[string]interface{}) *ErrorHandler {
+	return &ErrorHandler{
+		logger:   logger,
+		keyHash:  keyHash,
+		toolName: toolName,
+		params:   params,
+	}
+}
+
 // HandleError processes an error and returns an appropriate MCP error result
 func (e *ErrorHandler) HandleError(err error, operation string) *mcp.CallToolResult {
 	if err == nil {
 		return nil
+	}
+
+	// Log the tool error if logger is available
+	if e.logger != nil {
+		e.logger.LogToolError(e.keyHash, e.toolName, e.params, err.Error())
 	}
 
 	// Check if it's a YouTrack API error
@@ -42,7 +69,7 @@ func (e *ErrorHandler) handleAPIError(apiErr *youtrack.APIError, operation strin
 	case 400:
 		message = fmt.Sprintf("Bad request during %s: %s", operation, apiErr.Message)
 	case 401:
-		message = fmt.Sprintf("Authentication failed during %s. Please check your API key.", operation)
+		message = fmt.Sprintf("Authentication failed during %s. Please provide a valid YouTrack API token via the Authorization header, or configure the server with an api_key.", operation)
 	case 403:
 		message = fmt.Sprintf("Permission denied during %s. You don't have the required permissions.", operation)
 	case 404:
@@ -81,4 +108,13 @@ func (e *ErrorHandler) ValidatePositiveNumber(value float64, paramName string) e
 func (e *ErrorHandler) FormatValidationError(paramName string, err error) *mcp.CallToolResult {
 	message := fmt.Sprintf("Invalid %s parameter: %s", paramName, err.Error())
 	return mcp.NewToolResultError(message)
+}
+
+// CheckAuth verifies that valid authentication is available
+// Returns nil if auth is valid, or an error result if not
+func (e *ErrorHandler) CheckAuth(ctx context.Context, checker AuthChecker) *mcp.CallToolResult {
+	if checker == nil || !checker.HasValidAuth(ctx) {
+		return mcp.NewToolResultError("Authentication required. Please provide a valid YouTrack API token via the Authorization header, or configure the server with an api_key.")
+	}
+	return nil
 }

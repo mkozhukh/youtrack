@@ -96,6 +96,77 @@ func (c *Client) AddIssueAttachment(ctx *YouTrackContext, issueID string, filePa
 	return nil, fmt.Errorf("uploaded attachment not found in response")
 }
 
+// GetIssueAttachmentContent downloads the raw content of an attachment
+func (c *Client) GetIssueAttachmentContent(ctx *YouTrackContext, issueID string, attachmentID string) ([]byte, error) {
+	path := fmt.Sprintf("/api/issues/%s/attachments/%s/content", issueID, attachmentID)
+
+	resp, err := c.Get(ctx, path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get attachment content: %w", err)
+	}
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read attachment content: %w", err)
+	}
+
+	return data, nil
+}
+
+// AddIssueAttachmentFromBytes uploads content as an attachment to an issue
+func (c *Client) AddIssueAttachmentFromBytes(ctx *YouTrackContext, issueID string, content []byte, filename string) (*Attachment, error) {
+	// Create multipart form data
+	var requestBody bytes.Buffer
+	writer := multipart.NewWriter(&requestBody)
+
+	// Add the file field
+	fileWriter, err := writer.CreateFormFile("file", filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create form file: %w", err)
+	}
+
+	// Write content to form
+	_, err = fileWriter.Write(content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write content: %w", err)
+	}
+
+	// Close the writer to finalize the form
+	err = writer.Close()
+	if err != nil {
+		return nil, fmt.Errorf("failed to close form writer: %w", err)
+	}
+
+	// Make the API request
+	path := fmt.Sprintf("/api/issues/%s/attachments", issueID)
+	resp, err := c.doMultipartRequest(ctx, http.MethodPost, path, &requestBody, writer.FormDataContentType())
+	if err != nil {
+		return nil, fmt.Errorf("failed to upload attachment: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Parse response
+	var attachments []*Attachment
+	if err := json.NewDecoder(resp.Body).Decode(&attachments); err != nil {
+		return nil, fmt.Errorf("failed to decode attachment response: %w", err)
+	}
+
+	// Find the newly created attachment
+	for _, attachment := range attachments {
+		if attachment.Name == filename {
+			return attachment, nil
+		}
+	}
+
+	// Fallback to first attachment
+	if len(attachments) > 0 {
+		return attachments[0], nil
+	}
+
+	return nil, fmt.Errorf("uploaded attachment not found in response")
+}
+
 // doMultipartRequest makes an HTTP request with multipart form data
 func (c *Client) doMultipartRequest(ctx *YouTrackContext, method, path string, body io.Reader, contentType string) (*http.Response, error) {
 	fullURL := c.baseURL + path

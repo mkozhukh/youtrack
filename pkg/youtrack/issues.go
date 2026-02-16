@@ -210,6 +210,61 @@ func (c *Client) GetIssueLinks(ctx *YouTrackContext, issueID string) ([]*IssueLi
 	return links, nil
 }
 
+func (c *Client) ApplyCommand(ctx *YouTrackContext, issueID string, command string) error {
+	req := &CommandRequest{
+		Query: command,
+		Issues: []*IssueRef{
+			{ID: issueID},
+		},
+	}
+
+	resp, err := c.Post(ctx, "/api/commands", req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	return nil
+}
+
+func (c *Client) GetIssueCustomFields(ctx *YouTrackContext, issueID string) ([]*CustomFieldValue, error) {
+	path := fmt.Sprintf("/api/issues/%s/customFields", issueID)
+
+	query := url.Values{}
+	query.Add("fields", "name,$type,value(name,id,$type)")
+
+	resp, err := c.Get(ctx, path, query)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var fields []*CustomFieldValue
+	if err := json.NewDecoder(resp.Body).Decode(&fields); err != nil {
+		return nil, fmt.Errorf("failed to decode custom fields: %w", err)
+	}
+
+	return fields, nil
+}
+
+func (c *Client) GetAvailableLinkTypes(ctx *YouTrackContext) ([]*LinkType, error) {
+	query := url.Values{}
+	query.Add("fields", "id,name")
+
+	resp, err := c.Get(ctx, "/api/issueLinkTypes", query)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var linkTypes []*LinkType
+	if err := json.NewDecoder(resp.Body).Decode(&linkTypes); err != nil {
+		return nil, fmt.Errorf("failed to decode link types: %w", err)
+	}
+
+	return linkTypes, nil
+}
+
 func (c *Client) GetIssueActivities(ctx *YouTrackContext, issueID string) ([]*ActivityItem, error) {
 	path := fmt.Sprintf("/api/issues/%s/activities", issueID)
 

@@ -22,7 +22,9 @@ type TagHandlers struct {
 type YTClient interface {
 	EnsureTag(ctx context.Context, tagName string, color string) (string, error)
 	AddIssueTag(ctx context.Context, issueID string, tagName string) error
+	RemoveIssueTag(ctx context.Context, issueID string, tagName string) error
 	GetIssue(ctx context.Context, issueID string) (*youtrack.Issue, error)
+	ListTags(ctx context.Context, skip, top int) ([]*youtrack.Tag, error)
 }
 
 // NewTagHandlers creates a new instance of TagHandlers
@@ -91,6 +93,98 @@ func (h *TagHandlers) TagIssueHandler(ctx context.Context, request mcp.CallToolR
 	details += fmt.Sprintf("Current tags: %s\n", strings.Join(tagNames, ", "))
 
 	response := h.formatSuccessResult("Tag added successfully!", details)
+	return mcp.NewToolResultText(response), nil
+}
+
+// UntagIssueHandler handles removing tags from issues
+func (h *TagHandlers) UntagIssueHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	issueID, err := request.RequireString("issue_id")
+	if err != nil {
+		return h.errorHandler.FormatValidationError("issue_id", err), nil
+	}
+
+	tagName, err := request.RequireString("tag")
+	if err != nil {
+		return h.errorHandler.FormatValidationError("tag", err), nil
+	}
+
+	if h.toolLogger != nil {
+		h.toolLogger("untag_issue", map[string]interface{}{
+			"issue_id": issueID,
+			"tag":      tagName,
+		})
+	}
+
+	// Remove the tag from the issue
+	err = h.ytClient.RemoveIssueTag(ctx, issueID, tagName)
+	if err != nil {
+		return h.errorHandler.HandleError(err, "removing tag from issue"), nil
+	}
+
+	// Get updated issue details to confirm
+	issue, err := h.ytClient.GetIssue(ctx, issueID)
+	if err != nil {
+		return mcp.NewToolResultText(fmt.Sprintf("Tag '%s' removed from issue %s successfully", tagName, issueID)), nil
+	}
+
+	// Prepare response with updated tag list
+	var tagNames []string
+	for _, tag := range issue.Tags {
+		tagNames = append(tagNames, tag.Name)
+	}
+
+	details := fmt.Sprintf("Issue ID: %s\n", issueID)
+	details += fmt.Sprintf("Tag removed: %s\n", tagName)
+	if len(tagNames) > 0 {
+		details += fmt.Sprintf("Remaining tags: %s\n", strings.Join(tagNames, ", "))
+	} else {
+		details += "Remaining tags: (none)\n"
+	}
+
+	response := h.formatSuccessResult("Tag removed successfully!", details)
+	return mcp.NewToolResultText(response), nil
+}
+
+// SearchTagsHandler handles the search_tags tool call
+func (h *TagHandlers) SearchTagsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	query, err := request.RequireString("query")
+	if err != nil {
+		return h.errorHandler.FormatValidationError("query", err), nil
+	}
+
+	if h.toolLogger != nil {
+		h.toolLogger("search_tags", map[string]interface{}{
+			"query": query,
+		})
+	}
+
+	// Fetch all tags and filter by substring match
+	tags, err := h.ytClient.ListTags(ctx, 0, 200)
+	if err != nil {
+		return h.errorHandler.HandleError(err, "listing tags"), nil
+	}
+
+	lowerQuery := strings.ToLower(query)
+	var matches []*youtrack.Tag
+	for _, tag := range tags {
+		if strings.Contains(strings.ToLower(tag.Name), lowerQuery) {
+			matches = append(matches, tag)
+		}
+	}
+
+	if len(matches) == 0 {
+		return mcp.NewToolResultText(fmt.Sprintf("No tags found matching '%s'.", query)), nil
+	}
+
+	response := fmt.Sprintf("Tags matching '%s' (%d):\n\n", query, len(matches))
+	for _, tag := range matches {
+		color := ""
+		if !tag.Color.IsEmpty() {
+			color = fmt.Sprintf(" (color: %s)", tag.Color.String())
+		}
+		response += fmt.Sprintf("- %s (ID: %s)%s\n", tag.Name, tag.ID, color)
+	}
+
 	return mcp.NewToolResultText(response), nil
 }
 

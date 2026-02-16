@@ -194,8 +194,14 @@ type Attachment struct {
 }
 
 type CreateWorklogRequest struct {
-	Duration    int    `json:"duration"` // Duration in minutes
-	Description string `json:"text,omitempty"`
+	Duration    int              `json:"duration"` // Duration in minutes
+	Description string           `json:"text,omitempty"`
+	Date        *int64           `json:"date,omitempty"` // Unix epoch milliseconds
+	Type        *WorkTypeRequest `json:"type,omitempty"`
+}
+
+type WorkTypeRequest struct {
+	Name string `json:"name"`
 }
 
 type IssueLink struct {
@@ -217,6 +223,22 @@ type CreateIssueLinkRequest struct {
 
 type IssueRef struct {
 	ID string `json:"idReadable"`
+}
+
+type CustomFieldValue struct {
+	Name  string      `json:"name"`
+	Type  string      `json:"$type"`
+	Value interface{} `json:"value"`
+}
+
+type AllowedValue struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type CommandRequest struct {
+	Query  string      `json:"query"`
+	Issues []*IssueRef `json:"issues"`
 }
 
 // ActivityItem represents an activity item in the issue history

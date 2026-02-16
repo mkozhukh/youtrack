@@ -6,13 +6,14 @@
 - charmbracelet/log for logs
 - chi for web routing
 - koanf for configuration ( toml file )
-- use [mcp-go library](spec/go/mcp-go.md) for mcp server
+- use mcp-go for mcp server
 
 ## Extra information
 
-[mcp tasks specification](spec/go/mcp-go.md)
-[youtrack rest client](youtrack/README.md)
-[yt cli tool](youtrack/README.md)
+- [yt CLI specification](spec/yt.md) - CLI tool commands and options
+- [MCP tools specification](spec/mcp.md) - MCP server tools reference
+- [REST client API](spec/rest.md) - YouTrack REST client methods
+- [Usage scenarios](spec/usage.md) - Common workflow examples
 
 ## Workflow
 
@@ -23,4 +24,4 @@ For each iterations
 - ensure that build passes
     - `go build -o yt ./cmd/yt`
     - `go build -o youtrack-mcp ./cmd/youtrack-mcp`
-- run `go fmt`
+- run `go fmt ./...`

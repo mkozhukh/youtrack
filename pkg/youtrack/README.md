@@ -1,15 +1,6 @@
 # YouTrack API Client
 
-A stateless Go client library for the YouTrack REST API. This client provides a clean, idiomatic Go interface for interacting with YouTrack's issue tracking system.
-
-## Features
-
-- Stateless design with per-request authentication context
-- Full CRUD operations for issues, projects, and comments
-- Type-safe request and response structures
-- Comprehensive error handling
-- Built-in pagination support
-- Configurable HTTP client with timeouts
+A stateless Go client library for the YouTrack REST API. Provides an idiomatic Go interface for issue tracking, project management, time tracking, and more.
 
 ## Installation
 
@@ -20,446 +11,225 @@ import "mkozhukh/youtrack/pkg/youtrack"
 ## Quick Start
 
 ```go
-package main
+client := youtrack.NewClient("https://youtrack.example.com")
+ctx := youtrack.NewYouTrackContext(context.Background(), "your-api-key")
 
-import (
-    "context"
-    "fmt"
-    "log"
-    
-    "mkozhukh/youtrack/pkg/youtrack"
-)
-
-func main() {
-    // Create a new client
-    client := youtrack.NewClient("https://youtrack.example.com")
-    
-    // Create context with API key
-    ctx := youtrack.NewYouTrackContext(context.Background(), "your-api-key")
-    
-    // Get an issue
-    issue, err := client.GetIssue(ctx, "PROJ-123")
-    if err != nil {
-        log.Fatal(err)
-    }
-    
-    fmt.Printf("Issue: %s - %s\n", issue.ID, issue.Summary)
-}
+issue, err := client.GetIssue(ctx, "PROJ-123")
 ```
 
 ## Authentication
 
-The client uses Bearer token authentication. Create a context with your API key for each request:
+Bearer token via `YouTrackContext`. Obtain an API key from your YouTrack profile settings.
 
 ```go
 ctx := youtrack.NewYouTrackContext(context.Background(), "your-api-key")
 ```
 
-You can obtain an API key from your YouTrack profile settings.
+## API Reference
 
-## Public API Reference
+### Issues
 
-### Client Creation
+| Method | Signature | Description |
+|---|---|---|
+| GetIssue | `(issueID) -> Issue` | Get issue by readable ID |
+| CreateIssue | `(req) -> Issue` | Create issue with project, summary, description, custom fields |
+| UpdateIssue | `(issueID, req) -> Issue` | Update summary, description, or custom fields |
+| UpdateIssueAssignee | `(issueID, login) -> Issue` | Set assignee by exact login |
+| UpdateIssueAssigneeByProject | `(issueID, projectID, username) -> Issue` | Set assignee by fuzzy match within project members |
+| DeleteIssue | `(issueID) -> error` | Delete an issue |
+| SearchIssues | `(query, skip, top) -> []Issue` | Search using YouTrack query language, paginated |
+| SearchIssuesSorted | `(query, skip, top, sortBy, sortOrder) -> []Issue` | Search with `sort by:` clause appended |
+| ApplyCommand | `(issueID, command) -> error` | Apply a YouTrack command (e.g. `"State Open"`, `"Priority Critical"`) |
+| GetIssueCustomFields | `(issueID) -> []CustomFieldValue` | Get all custom field values for an issue |
+| GetAvailableLinkTypes | `() -> []LinkType` | List all link types (e.g. "Depends on", "Subtask of") |
+| CreateIssueLink | `(sourceID, targetID, linkType) -> error` | Link two issues via command |
+| GetIssueLinks | `(issueID) -> []IssueLink` | Get all links for an issue |
+| GetIssueActivities | `(issueID) -> []ActivityItem` | Get full activity/history log |
 
-```go
-func NewClient(baseURL string) *Client
-```
+### Comments
 
-Creates a new YouTrack API client with the specified base URL.
+| Method | Signature | Description |
+|---|---|---|
+| GetIssueComments | `(issueID) -> []IssueComment` | List all comments |
+| AddIssueComment | `(issueID, text) -> IssueComment` | Add a comment |
+| UpdateIssueComment | `(issueID, commentID, text) -> IssueComment` | Update a comment |
+| DeleteIssueComment | `(issueID, commentID) -> error` | Delete a comment |
 
-### Context Management
+### Tags
 
-```go
-func NewYouTrackContext(ctx context.Context, apiKey string) *YouTrackContext
-```
+| Method | Signature | Description |
+|---|---|---|
+| GetIssueTags | `(issueID) -> []IssueTag` | Get tags on an issue |
+| AddIssueTag | `(issueID, tagName) -> error` | Add a tag to an issue |
+| RemoveIssueTag | `(issueID, tagName) -> error` | Remove a tag from an issue |
+| ListTags | `(skip, top) -> []Tag` | List all tags, paginated |
+| CreateTag | `(name, color) -> Tag` | Create a new tag |
+| GetTagByName | `(name) -> Tag` | Find tag by exact name |
+| EnsureTag | `(name, color) -> tagID` | Get or create tag, return ID |
 
-Creates a new context with authentication information. The context can be used to cancel operations or set timeouts.
+### Attachments
 
-### Issues API
+| Method | Signature | Description |
+|---|---|---|
+| GetIssueAttachments | `(issueID) -> []Attachment` | List attachment metadata |
+| AddIssueAttachment | `(issueID, filePath) -> Attachment` | Upload a file (multipart) |
+| GetIssueAttachmentContent | `(issueID, attachmentID) -> []byte` | Download raw attachment bytes |
 
-#### Get Issue
-```go
-func (c *Client) GetIssue(ctx *YouTrackContext, issueID string) (*Issue, error)
-```
+### Worklogs
 
-Retrieves a single issue by ID.
+| Method | Signature | Description |
+|---|---|---|
+| GetIssueWorklogs | `(issueID) -> []WorkItem` | List work items for an issue |
+| AddIssueWorklog | `(issueID, req) -> WorkItem` | Add work item (duration in minutes) |
+| GetUserWorklogs | `(userID, projectID, start, end, skip, top) -> []WorkItem` | User's work items, filtered by project/dates |
 
-#### Create Issue
-```go
-func (c *Client) CreateIssue(ctx *YouTrackContext, req *CreateIssueRequest) (*Issue, error)
-```
+### Projects
 
-Creates a new issue. Example:
-```go
-req := &youtrack.CreateIssueRequest{
-    Project:     "PROJ",
-    Summary:     "New feature request",
-    Description: "Detailed description here",
-}
-issue, err := client.CreateIssue(ctx, req)
-```
+| Method | Signature | Description |
+|---|---|---|
+| GetProject | `(projectID) -> Project` | Get project by internal ID |
+| GetProjectByName | `(name) -> Project` | Find by name or short name (case-insensitive) |
+| ListProjects | `(skip, top) -> []Project` | List all projects, paginated |
+| GetProjectIssues | `(projectID, skip, top) -> []Issue` | Issues in a project, paginated |
+| GetProjectCustomFields | `(projectID) -> []CustomField` | Custom field definitions for a project |
+| GetCustomFieldAllowedValues | `(projectID, fieldName) -> []AllowedValue` | Allowed values for a bundle-backed field |
+| AddCustomFieldEnumValue | `(projectID, fieldName, value, color) -> error` | Add enum value to a field's bundle |
 
-#### Update Issue
-```go
-func (c *Client) UpdateIssue(ctx *YouTrackContext, issueID string, req *UpdateIssueRequest) (*Issue, error)
-```
+### Users
 
-Updates an existing issue. Example:
-```go
-summary := "Updated summary"
-assignee := "user123"  // User ID, not login
-req := &youtrack.UpdateIssueRequest{
-    Summary: &summary,
-    Assignee: &assignee,
-}
-issue, err := client.UpdateIssue(ctx, "PROJ-123", req)
-```
-
-#### Update Issue Assignee
-```go
-func (c *Client) UpdateIssueAssignee(ctx *YouTrackContext, issueID string, assigneeLogin string) (*Issue, error)
-```
-
-Updates issue assignee by exact login. Example:
-```go
-issue, err := client.UpdateIssueAssignee(ctx, "PROJ-123", "john.doe")
-```
-
-#### Update Issue Assignee by Project
-```go
-func (c *Client) UpdateIssueAssigneeByProject(ctx *YouTrackContext, issueID string, projectID string, username string) (*Issue, error)
-```
-
-Updates issue assignee using fuzzy matching within project users. Example:
-```go
-// Will find and assign the first user matching "john" in project "PROJ"
-issue, err := client.UpdateIssueAssigneeByProject(ctx, "PROJ-123", "PROJ", "john")
-```
-
-#### Delete Issue
-```go
-func (c *Client) DeleteIssue(ctx *YouTrackContext, issueID string) error
-```
-
-Deletes an issue.
-
-#### Search Issues
-```go
-func (c *Client) SearchIssues(ctx *YouTrackContext, query string, skip, top int) ([]*Issue, error)
-```
-
-Searches for issues using YouTrack query language. Example:
-```go
-issues, err := client.SearchIssues(ctx, "project: PROJ state: Open", 0, 10)
-```
-
-### Projects API
-
-#### Get Project
-```go
-func (c *Client) GetProject(ctx *YouTrackContext, projectID string) (*Project, error)
-```
-
-Retrieves project details by ID.
-
-#### List Projects
-```go
-func (c *Client) ListProjects(ctx *YouTrackContext, skip, top int) ([]*Project, error)
-```
-
-Lists all accessible projects with pagination.
-
-### Comments API
-
-#### Get Issue Comments
-```go
-func (c *Client) GetIssueComments(ctx *YouTrackContext, issueID string) ([]*IssueComment, error)
-```
-
-Retrieves all comments for an issue.
-
-#### Add Comment
-```go
-func (c *Client) AddIssueComment(ctx *YouTrackContext, issueID string, text string) (*IssueComment, error)
-```
-
-Adds a new comment to an issue.
-
-#### Update Comment
-```go
-func (c *Client) UpdateIssueComment(ctx *YouTrackContext, issueID, commentID string, text string) (*IssueComment, error)
-```
-
-Updates an existing comment.
-
-#### Delete Comment
-```go
-func (c *Client) DeleteIssueComment(ctx *YouTrackContext, issueID, commentID string) error
-```
-
-Deletes a comment from an issue.
-
-### Users API
-
-#### Get User
-```go
-func (c *Client) GetUser(ctx *YouTrackContext, userID string) (*User, error)
-```
-
-Retrieves user details by ID.
-
-#### Search Users
-```go
-func (c *Client) SearchUsers(ctx *YouTrackContext, query string, skip, top int) ([]*User, error)
-```
-
-Searches for users. Example:
-```go
-users, err := client.SearchUsers(ctx, "john", 0, 10)
-```
-
-#### Get User by Login
-```go
-func (c *Client) GetUserByLogin(ctx *YouTrackContext, login string) (*User, error)
-```
-
-Finds user by login name. Example:
-```go
-user, err := client.GetUserByLogin(ctx, "john.doe")
-```
-
-#### Get Project Users
-```go
-func (c *Client) GetProjectUsers(ctx *YouTrackContext, projectID string, skip, top int) ([]*User, error)
-```
-
-Retrieves users who have access to a specific project. Example:
-```go
-users, err := client.GetProjectUsers(ctx, "PROJ", 0, 50)
-```
-
-#### Suggest User by Project
-```go
-func (c *Client) SuggestUserByProject(ctx *YouTrackContext, projectID string, username string) (*User, error)
-```
-
-Finds the first user in a project whose login, full name, or email contains the given username (case-insensitive). Perfect for fuzzy matching when you remember part of someone's name. Example:
-```go
-// Will match users like "john.doe", "John Smith", "johnsmith@example.com"
-user, err := client.SuggestUserByProject(ctx, "PROJ", "john")
-```
-
-### Tags API
-
-#### Get Issue Tags
-```go
-func (c *Client) GetIssueTags(ctx *YouTrackContext, issueID string) ([]*IssueTag, error)
-```
-
-Retrieves all tags for an issue.
-
-#### Add Issue Tag
-```go
-func (c *Client) AddIssueTag(ctx *YouTrackContext, issueID string, tagName string) error
-```
-
-Adds a tag to an issue. Example:
-```go
-err := client.AddIssueTag(ctx, "PROJ-123", "needs-triage")
-```
-
-#### Remove Issue Tag
-```go
-func (c *Client) RemoveIssueTag(ctx *YouTrackContext, issueID string, tagName string) error
-```
-
-Removes a tag from an issue.
-
-#### List Tags
-```go
-func (c *Client) ListTags(ctx *YouTrackContext, skip, top int) ([]*Tag, error)
-```
-
-Lists all available tags with pagination.
-
-#### Create Tag
-```go
-func (c *Client) CreateTag(ctx *YouTrackContext, name string, color string) (*Tag, error)
-```
-
-Creates a new tag. Example:
-```go
-tag, err := client.CreateTag(ctx, "urgent", "#ff0000")
-```
-
-#### Get Tag by Name
-```go
-func (c *Client) GetTagByName(ctx *YouTrackContext, name string) (*Tag, error)
-```
-
-Finds a tag by its name. Example:
-```go
-tag, err := client.GetTagByName(ctx, "needs-triage")
-```
-
-#### Ensure Tag
-```go
-func (c *Client) EnsureTag(ctx *YouTrackContext, name string, color string) (string, error)
-```
-
-Returns tag ID if tag exists, otherwise creates new tag and returns its ID. Example:
-```go
-tagID, err := client.EnsureTag(ctx, "needs-triage", "#ffa500")
-```
+| Method | Signature | Description |
+|---|---|---|
+| GetCurrentUser | `() -> User` | Authenticated user's profile |
+| GetUser | `(userID) -> User` | Get user by internal ID |
+| SearchUsers | `(query, skip, top) -> []User` | Search users, paginated |
+| GetUserByLogin | `(login) -> User` | Find by exact login |
+| GetProjectUsers | `(projectID, skip, top) -> []User` | Project members, paginated |
+| SuggestUserByProject | `(projectID, username) -> User` | Fuzzy match user in project (login/name/email) |
 
 ## Data Types
 
-### Issue
 ```go
 type Issue struct {
-    ID          string
+    ID          string        // Readable ID, e.g. "PROJ-123"
     Summary     string
     Description string
-    Created     time.Time
-    Updated     time.Time
-    Resolved    *time.Time
+    Created     YouTrackTime
+    Updated     YouTrackTime
+    Resolved    *YouTrackTime
     Reporter    *User
     UpdatedBy   *User
     Assignee    *User
     Tags        []*IssueTag
-    Fields      map[string]interface{} // Custom fields
 }
-```
 
-### User
-```go
 type User struct {
     ID       string
     Login    string
     FullName string
     Email    string
 }
-```
 
-### Project
-```go
 type Project struct {
     ID          string
     Name        string
     ShortName   string
     Description string
 }
-```
 
-### IssueComment
-```go
 type IssueComment struct {
     ID      string
     Author  *User
     Text    string
-    Created time.Time
-    Updated time.Time
+    Created YouTrackTime
+    Updated YouTrackTime
 }
-```
 
-### Tag
-```go
 type Tag struct {
     ID    string
     Name  string
-    Color string
+    Color YouTrackColor
 }
-```
 
-### IssueTag
-```go
-type IssueTag struct {
-    ID    string
+type WorkItem struct {
+    ID          string
+    Author      *User
+    Date        YouTrackTime
+    Duration    int          // minutes
+    Description string
+    Type        *WorkType
+    Issue       *Issue
+}
+
+type Attachment struct {
+    ID       string
+    Name     string
+    Size     int64
+    Created  YouTrackTime
+    Author   *User
+    MimeType string
+    URL      string
+}
+
+type IssueLink struct {
+    ID        string
+    Direction string
+    LinkType  *LinkType
+    Issues    []*Issue
+}
+
+type CustomFieldValue struct {
     Name  string
-    Color string
+    Type  string       // $type
+    Value interface{}  // nested object with name, id, $type
+}
+
+type AllowedValue struct {
+    ID   string
+    Name string
+}
+
+type ActivityItem struct {
+    ID        string
+    Category  Category
+    Author    *User
+    Timestamp YouTrackTime
+    Field     *Field
+    Added     *FieldValue
+    Removed   *FieldValue
 }
 ```
 
 ## Error Handling
 
-The client returns an `APIError` for YouTrack API errors:
+API errors are returned as `*APIError`:
 
 ```go
 issue, err := client.GetIssue(ctx, "INVALID-ID")
 if err != nil {
     if apiErr, ok := err.(*youtrack.APIError); ok {
-        fmt.Printf("API error: %d - %s\n", apiErr.StatusCode, apiErr.Message)
+        fmt.Printf("status %d: %s\n", apiErr.StatusCode, apiErr.Message)
     }
 }
 ```
 
-## Advanced Usage
+## Pagination
 
-### Custom Timeouts
-
-```go
-ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-defer cancel()
-
-ytCtx := youtrack.NewYouTrackContext(ctx, "your-api-key")
-issue, err := client.GetIssue(ytCtx, "PROJ-123")
-```
-
-### Pagination
+All list methods support `skip`/`top` parameters:
 
 ```go
-// Get issues in batches
 skip := 0
 top := 50
-
 for {
     issues, err := client.SearchIssues(ctx, "project: PROJ", skip, top)
     if err != nil {
         return err
     }
-    
     if len(issues) == 0 {
         break
     }
-    
-    // Process issues
     for _, issue := range issues {
         fmt.Printf("%s: %s\n", issue.ID, issue.Summary)
     }
-    
     skip += len(issues)
 }
 ```
-
-### Custom Fields
-
-Access custom fields through the `Fields` map:
-
-```go
-issue, err := client.GetIssue(ctx, "PROJ-123")
-if err != nil {
-    return err
-}
-
-if priority, ok := issue.Fields["Priority"]; ok {
-    fmt.Printf("Priority: %v\n", priority)
-}
-```
-
-## Best Practices
-
-1. **Reuse clients**: Create one client instance and reuse it for multiple requests
-2. **Handle errors**: Always check for `APIError` to get detailed error information
-3. **Use contexts**: Leverage contexts for cancellation and timeouts
-4. **Pagination**: Use pagination for large result sets to avoid timeouts
-5. **Field selection**: The client automatically selects commonly used fields to minimize response size
-
-## Requirements
-
-- Go 1.19 or higher
-- Valid YouTrack instance URL
-- YouTrack API key with appropriate permissions
-
-## License
-
-This client is part of the YouTrack MCP project. See the parent project for license information.

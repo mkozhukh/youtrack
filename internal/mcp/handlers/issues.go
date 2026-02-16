@@ -6,34 +6,46 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mkozhukh/youtrack/internal/mcp/resolver"
 	"github.com/mkozhukh/youtrack/pkg/youtrack"
 
+	"github.com/charmbracelet/log"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
 // IssueHandlers contains all the handlers for issue-related tools
 type IssueHandlers struct {
-	ytClient     YouTrackClientInterface
-	toolLogger   func(string, map[string]interface{})
-	errorHandler *ErrorHandler
+	ytClient       YouTrackClientInterface
+	resolver       *resolver.Resolver
+	toolLogger     func(string, map[string]interface{})
+	errorHandler   *ErrorHandler
+	projectTracker ProjectTracker
 }
 
 // YouTrackClientInterface defines the interface for YouTrack client operations
 type YouTrackClientInterface interface {
 	SearchIssues(ctx context.Context, query string, skip, top int) ([]*youtrack.Issue, error)
+	SearchIssuesSorted(ctx context.Context, query string, skip, top int, sortBy, sortOrder string) ([]*youtrack.Issue, error)
 	GetIssue(ctx context.Context, issueID string) (*youtrack.Issue, error)
 	GetIssueComments(ctx context.Context, issueID string) ([]*youtrack.IssueComment, error)
+	GetIssueCustomFields(ctx context.Context, issueID string) ([]*youtrack.CustomFieldValue, error)
 	CreateIssue(ctx context.Context, req *youtrack.CreateIssueRequest) (*youtrack.Issue, error)
 	UpdateIssue(ctx context.Context, issueID string, req *youtrack.UpdateIssueRequest) (*youtrack.Issue, error)
 	UpdateIssueAssigneeByProject(ctx context.Context, issueID string, projectID string, username string) (*youtrack.Issue, error)
+	DeleteIssue(ctx context.Context, issueID string) error
+	// Resolver support
+	GetProjectUsers(ctx context.Context, projectID string, skip, top int) ([]*youtrack.User, error)
+	GetCustomFieldAllowedValues(ctx context.Context, projectID string, fieldName string) ([]youtrack.AllowedValue, error)
 }
 
 // NewIssueHandlers creates a new instance of IssueHandlers
-func NewIssueHandlers(ytClient YouTrackClientInterface, toolLogger func(string, map[string]interface{})) *IssueHandlers {
+func NewIssueHandlers(ytClient YouTrackClientInterface, toolLogger func(string, map[string]interface{}), projectTracker ProjectTracker) *IssueHandlers {
 	return &IssueHandlers{
-		ytClient:     ytClient,
-		toolLogger:   toolLogger,
-		errorHandler: NewErrorHandler(),
+		ytClient:       ytClient,
+		resolver:       resolver.NewResolver(ytClient),
+		toolLogger:     toolLogger,
+		errorHandler:   NewErrorHandler(),
+		projectTracker: projectTracker,
 	}
 }
 
@@ -48,6 +60,8 @@ func (h *IssueHandlers) GetIssueListHandler(ctx context.Context, request mcp.Cal
 	args := request.GetArguments()
 	query, _ := args["query"].(string)
 	maxResults, _ := args["max_results"].(float64)
+	sortBy, _ := args["sort_by"].(string)
+	sortOrder, _ := args["sort_order"].(string)
 
 	// Convert max_results to int and validate
 	maxResultsInt := int(maxResults)
@@ -55,6 +69,16 @@ func (h *IssueHandlers) GetIssueListHandler(ctx context.Context, request mcp.Cal
 		if err := h.errorHandler.ValidatePositiveNumber(maxResults, "max_results"); err != nil {
 			return h.errorHandler.FormatValidationError("max_results", err), nil
 		}
+	}
+
+	// Default sort order
+	if sortOrder == "" {
+		sortOrder = "desc"
+	}
+
+	// Track project usage
+	if h.projectTracker != nil {
+		h.projectTracker.TrackProject(ctx, projectID)
 	}
 
 	// Build optimized query with smart defaults
@@ -67,11 +91,18 @@ func (h *IssueHandlers) GetIssueListHandler(ctx context.Context, request mcp.Cal
 			"query":           query,
 			"optimized_query": optimizedQuery,
 			"max_results":     maxResultsInt,
+			"sort_by":         sortBy,
+			"sort_order":      sortOrder,
 		})
 	}
 
-	// Search for issues
-	issues, err := h.ytClient.SearchIssues(ctx, optimizedQuery, 0, maxResultsInt)
+	// Search for issues — use sorted search if sort_by is provided
+	var issues []*youtrack.Issue
+	if sortBy != "" {
+		issues, err = h.ytClient.SearchIssuesSorted(ctx, optimizedQuery, 0, maxResultsInt, sortBy, sortOrder)
+	} else {
+		issues, err = h.ytClient.SearchIssues(ctx, optimizedQuery, 0, maxResultsInt)
+	}
 	if err != nil {
 		return h.errorHandler.HandleError(err, "searching issues"), nil
 	}
@@ -108,8 +139,14 @@ func (h *IssueHandlers) GetIssueDetailsHandler(ctx context.Context, request mcp.
 		return h.errorHandler.HandleError(err, "retrieving issue comments"), nil
 	}
 
+	// Get custom fields (non-critical, log error but continue)
+	customFields, err := h.ytClient.GetIssueCustomFields(ctx, issueID)
+	if err != nil {
+		log.Warn("Failed to retrieve custom fields", "issue_id", issueID, "error", err)
+	}
+
 	// Format the response
-	response := h.formatIssueDetails(issue, comments)
+	response := h.formatIssueDetails(issue, comments, customFields)
 	return mcp.NewToolResultText(response), nil
 }
 
@@ -133,6 +170,11 @@ func (h *IssueHandlers) CreateIssueHandler(ctx context.Context, request mcp.Call
 
 	args := request.GetArguments()
 	description, _ := args["description"].(string)
+
+	// Track project usage
+	if h.projectTracker != nil {
+		h.projectTracker.TrackProject(ctx, projectID)
+	}
 
 	// Log the tool call
 	if h.toolLogger != nil {
@@ -186,7 +228,13 @@ func (h *IssueHandlers) UpdateIssueHandler(ctx context.Context, request mcp.Call
 		})
 	}
 
-	// Start with getting the current issue to extract project ID for assignee update
+	// Extract project ID from the issue ID (assuming format like PROJECT-123)
+	projectID := extractProjectFromIssueID(issueID)
+	if projectID == "" {
+		return mcp.NewToolResultError("Could not extract project ID from issue ID. Issue ID should be in format PROJECT-123"), nil
+	}
+
+	// Start with getting the current issue
 	currentIssue, err := h.ytClient.GetIssue(ctx, issueID)
 	if err != nil {
 		return h.errorHandler.HandleError(err, "retrieving current issue"), nil
@@ -206,12 +254,21 @@ func (h *IssueHandlers) UpdateIssueHandler(ctx context.Context, request mcp.Call
 		hasUpdates = true
 	}
 
+	// Resolve and validate state if provided
 	if state != "" {
-		// Handle state update through custom fields
-		if updateReq.Fields == nil {
-			updateReq.Fields = make(map[string]interface{})
+		resolvedState, err := h.resolver.ResolveEnumValue(ctx, projectID, "State", state)
+		if err != nil {
+			if resolveErr, ok := err.(*resolver.ResolveError); ok {
+				return mcp.NewToolResultError(resolveErr.Error()), nil
+			}
+			return h.errorHandler.HandleError(err, "resolving state value"), nil
 		}
-		updateReq.Fields["State"] = state
+
+		updateReq.Fields = append(updateReq.Fields, youtrack.CustomField{
+			Name:  "State",
+			Type:  "StateIssueCustomField",
+			Value: youtrack.SingleValue{Value: resolvedState},
+		})
 		hasUpdates = true
 	}
 
@@ -227,13 +284,16 @@ func (h *IssueHandlers) UpdateIssueHandler(ctx context.Context, request mcp.Call
 
 	// Handle assignee update separately if provided
 	if assignee != "" {
-		// Extract project ID from the issue ID (assuming format like PROJECT-123)
-		projectID := extractProjectFromIssueID(issueID)
-		if projectID == "" {
-			return mcp.NewToolResultError("Could not extract project ID from issue ID. Issue ID should be in format PROJECT-123"), nil
+		// Resolve assignee using smart matching
+		resolvedAssignee, err := h.resolver.ResolveUser(ctx, projectID, assignee)
+		if err != nil {
+			if resolveErr, ok := err.(*resolver.ResolveError); ok {
+				return mcp.NewToolResultError(resolveErr.Error()), nil
+			}
+			return h.errorHandler.HandleError(err, "resolving assignee"), nil
 		}
 
-		updatedIssue, err = h.ytClient.UpdateIssueAssigneeByProject(ctx, issueID, projectID, assignee)
+		updatedIssue, err = h.ytClient.UpdateIssueAssigneeByProject(ctx, issueID, projectID, resolvedAssignee)
 		if err != nil {
 			return h.errorHandler.HandleError(err, "updating issue assignee"), nil
 		}
@@ -344,7 +404,7 @@ func (h *IssueHandlers) formatIssueList(issues []*youtrack.Issue) string {
 	return response + footer
 }
 
-func (h *IssueHandlers) formatIssueDetails(issue *youtrack.Issue, comments []*youtrack.IssueComment) string {
+func (h *IssueHandlers) formatIssueDetails(issue *youtrack.Issue, comments []*youtrack.IssueComment, customFields []*youtrack.CustomFieldValue) string {
 	assignee := "Unassigned"
 	if issue.Assignee != nil {
 		assignee = fmt.Sprintf("%s (%s)", issue.Assignee.FullName, issue.Assignee.Login)
@@ -381,6 +441,13 @@ func (h *IssueHandlers) formatIssueDetails(issue *youtrack.Issue, comments []*yo
 			response += tag.Name
 		}
 		response += "\n"
+	}
+
+	if len(customFields) > 0 {
+		response += "\n📌 Custom Fields:\n"
+		for _, field := range customFields {
+			response += fmt.Sprintf("   %s: %v\n", field.Name, formatFieldValue(field.Value))
+		}
 	}
 
 	if len(comments) > 0 {
@@ -429,6 +496,58 @@ func (h *IssueHandlers) formatUpdatedIssue(issue *youtrack.Issue) string {
 	details += fmt.Sprintf("Updated: %s\n", issue.Updated.Format("2006-01-02 15:04:05"))
 
 	return h.formatSuccessResult("Issue updated successfully!", details)
+}
+
+// DeleteIssueHandler handles the delete_issue tool call
+func (h *IssueHandlers) DeleteIssueHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	issueID, err := request.RequireString("issue_id")
+	if err != nil {
+		return h.errorHandler.FormatValidationError("issue_id", err), nil
+	}
+
+	if h.toolLogger != nil {
+		h.toolLogger("delete_issue", map[string]interface{}{
+			"issue_id": issueID,
+		})
+	}
+
+	err = h.ytClient.DeleteIssue(ctx, issueID)
+	if err != nil {
+		return h.errorHandler.HandleError(err, "deleting issue"), nil
+	}
+
+	return mcp.NewToolResultText(fmt.Sprintf("Issue %s deleted successfully.", issueID)), nil
+}
+
+// formatFieldValue converts a custom field value to a display string
+func formatFieldValue(value interface{}) string {
+	if value == nil {
+		return "<empty>"
+	}
+	switch v := value.(type) {
+	case map[string]interface{}:
+		if name, ok := v["name"].(string); ok {
+			return name
+		}
+		if login, ok := v["login"].(string); ok {
+			return login
+		}
+		return fmt.Sprintf("%v", v)
+	case []interface{}:
+		var names []string
+		for _, item := range v {
+			if m, ok := item.(map[string]interface{}); ok {
+				if name, ok := m["name"].(string); ok {
+					names = append(names, name)
+					continue
+				}
+			}
+			names = append(names, fmt.Sprintf("%v", item))
+		}
+		return strings.Join(names, ", ")
+	default:
+		return fmt.Sprintf("%v", v)
+	}
 }
 
 // extractProjectFromIssueID extracts the project ID from an issue ID

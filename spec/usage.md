@@ -1,14 +1,14 @@
-### YouTrack MCP Usage Scenario: Support Engineer Workflow
+### YouTrack MCP Usage Scenarios
 
-This document outlines a typical workflow for a support engineer using the YouTrack MCP (Machine-to-Machine Command Protocol) to manage issues.
-
-**Scenario:** A customer reports a bug where the "Export to PDF" feature is failing in the "Metrico" application.
+This document outlines typical workflows using the YouTrack MCP (Model Context Protocol) server.
 
 ---
 
-#### Step 1: Triage - Check for Existing Issues
+## Scenario 1: Support Engineer - Bug Report Triage
 
-The first step is to see if this bug has already been reported. The support engineer searches for open issues in the "Metrico" project containing the "PDF" keyword.
+**Context:** A customer reports a bug where the "Export to PDF" feature is failing.
+
+#### Step 1: Check for Existing Issues
 
 *   **Action:** Search for existing issues.
 *   **Tool Used:** `get_issue_list`
@@ -16,13 +16,9 @@ The first step is to see if this bug has already been reported. The support engi
     ```
     get_issue_list(project_id="METRICO", query="PDF #unresolved")
     ```
-*   **Expected Outcome:** The tool returns a list of issues. In this case, let's assume it returns an empty list, indicating this is a new bug.
-
----
+*   **Expected Outcome:** Returns a list of matching issues, or empty if none found.
 
 #### Step 2: Create a New Issue
-
-Since no existing issue was found, the support engineer creates a new one.
 
 *   **Action:** Create a new bug report.
 *   **Tool Used:** `create_issue`
@@ -31,16 +27,12 @@ Since no existing issue was found, the support engineer creates a new one.
     create_issue(
       project_id="METRICO",
       summary="Export to PDF feature fails on large reports",
-      description="When a user tries to export a report with over 500 rows, the process times out and results in a 504 Gateway Timeout error. This has been reproduced on staging environment."
+      description="When a user tries to export a report with over 500 rows, the process times out."
     )
     ```
-*   **Expected Outcome:** The tool successfully creates the issue in YouTrack and returns the new issue ID, for example, `{"issue_id": "METRICO-5821"}`.
-
----
+*   **Expected Outcome:** Issue created, returns issue ID (e.g., `METRICO-5821`).
 
 #### Step 3: Assign the Issue
-
-The support engineer now assigns the newly created issue to the appropriate developer, "john.doe", for investigation.
 
 *   **Action:** Assign the bug to a developer.
 *   **Tool Used:** `update_issue`
@@ -48,49 +40,256 @@ The support engineer now assigns the newly created issue to the appropriate deve
     ```
     update_issue(issue_id="METRICO-5821", assignee="john.doe")
     ```
-*   **Expected Outcome:** The tool finds the user "john.doe", assigns the issue to them, and confirms the update was successful. The underlying REST client would first call the `GET /api/users` endpoint to find the correct user object for "john.doe" before making the update call.
+*   **Expected Outcome:** Issue assigned. Partial name match works (e.g., "john" matches "john.doe").
 
----
+#### Step 4: Add Comment
 
-#### Step 4: Add Contextual Information
-
-The customer provided a log file. The support engineer adds a comment to the issue with a link to the log.
-
-*   **Action:** Add a comment with a link to logs.
+*   **Action:** Add context from customer.
 *   **Tool Used:** `add_comment`
 *   **Command:**
     ```
-    add_comment(
-      issue_id="METRICO-5821",
-      comment="Customer has provided logs. See attached file: [link_to_logs.txt]"
-    )
+    add_comment(issue_id="METRICO-5821", comment="Customer provided logs. See attachment.")
     ```
-*   **Expected Outcome:** The comment is successfully added to the issue `METRICO-5821`.
+*   **Expected Outcome:** Comment added to the issue.
 
----
+#### Step 5: Tag for Prioritization
 
-#### Step 5: Tag the Issue for Prioritization
-
-To ensure the issue is reviewed in the next triage meeting, the support engineer adds a "needs-triage" tag.
-
-*   **Action:** Tag the issue for the next triage meeting.
+*   **Action:** Tag for triage meeting.
 *   **Tool Used:** `tag_issue`
 *   **Command:**
     ```
     tag_issue(issue_id="METRICO-5821", tag="needs-triage")
     ```
-*   **Expected Outcome:** The "needs-triage" tag is created if it doesn't exist and is then successfully applied to the issue.
+*   **Expected Outcome:** Tag created (if new) and applied to issue.
 
----
+#### Step 6: Verify
 
-#### Step 6: Final Verification
-
-The support engineer does a final check to ensure all the details—assignee, comment, and tag—are correctly reflected on the issue.
-
-*   **Action:** Verify all updates on the issue.
+*   **Action:** Verify all updates.
 *   **Tool Used:** `get_issue_details`
 *   **Command:**
     ```
     get_issue_details(issue_id="METRICO-5821")
     ```
-*   **Expected Outcome:** The tool returns a detailed view of issue `METRICO-5821`, including its summary, description, current state, the assignee ("john.doe"), all comments, and the "needs-triage" tag. This confirms the issue is correctly filed and routed.
+*   **Expected Outcome:** Returns full issue details including assignee, comments, and tags.
+
+---
+
+## Scenario 2: Developer - Issue Investigation
+
+**Context:** Developer investigates an assigned issue.
+
+#### Step 1: Get Issue Details
+
+*   **Action:** Read issue details and comments.
+*   **Tool Used:** `get_issue_details`
+*   **Command:**
+    ```
+    get_issue_details(issue_id="METRICO-5821")
+    ```
+*   **Expected Outcome:** Returns summary, description, comments, custom fields.
+
+#### Step 2: Check Related Issues
+
+*   **Action:** Find linked/blocking issues.
+*   **Tool Used:** `get_issue_links`
+*   **Command:**
+    ```
+    get_issue_links(issue_id="METRICO-5821")
+    ```
+*   **Expected Outcome:** Returns all linked issues grouped by link type.
+
+#### Step 3: Get Attachments
+
+*   **Action:** List attached files.
+*   **Tool Used:** `get_issue_attachments`
+*   **Command:**
+    ```
+    get_issue_attachments(issue_id="METRICO-5821")
+    ```
+*   **Expected Outcome:** Returns list of attachments with IDs, names, sizes.
+
+#### Step 4: Download Attachment
+
+*   **Action:** Read attachment content.
+*   **Tool Used:** `get_issue_attachment_content`
+*   **Command:**
+    ```
+    get_issue_attachment_content(issue_id="METRICO-5821", attachment_id="123-456")
+    ```
+*   **Expected Outcome:** Returns file content (text or base64 for binary).
+
+---
+
+## Scenario 3: Developer - Status Update Workflow
+
+**Context:** Developer updates issue status as work progresses.
+
+#### Step 1: Start Work
+
+*   **Action:** Change state to In Progress.
+*   **Tool Used:** `update_issue`
+*   **Command:**
+    ```
+    update_issue(issue_id="METRICO-5821", state="In Progress")
+    ```
+*   **Expected Outcome:** State updated. Partial match works ("progress" → "In Progress").
+
+#### Step 2: Add Progress Comment
+
+*   **Action:** Document progress.
+*   **Tool Used:** `add_comment`
+*   **Command:**
+    ```
+    add_comment(issue_id="METRICO-5821", comment="Root cause identified: memory limit exceeded.")
+    ```
+*   **Expected Outcome:** Comment added.
+
+#### Step 3: Complete Work
+
+*   **Action:** Mark as fixed.
+*   **Tool Used:** `update_issue`
+*   **Command:**
+    ```
+    update_issue(issue_id="METRICO-5821", state="Fixed")
+    ```
+*   **Expected Outcome:** State updated to Fixed.
+
+---
+
+## Scenario 4: Link Related Issues
+
+**Context:** Developer finds a related/duplicate issue.
+
+#### Step 1: Search for Related Issues
+
+*   **Action:** Find potentially related issues.
+*   **Tool Used:** `get_issue_list`
+*   **Command:**
+    ```
+    get_issue_list(project_id="METRICO", query="PDF export timeout")
+    ```
+*   **Expected Outcome:** Returns list of matching issues.
+
+#### Step 2: Create Link
+
+*   **Action:** Link issues together.
+*   **Tool Used:** `create_issue_link`
+*   **Command:**
+    ```
+    create_issue_link(
+      source_issue_id="METRICO-5821",
+      target_issue_id="METRICO-5100",
+      link_type="relates to"
+    )
+    ```
+*   **Expected Outcome:** Link created between the two issues.
+
+Link types: `"depends on"`, `"is required for"`, `"relates to"`, `"duplicates"`, `"parent for"`, `"subtask of"`
+
+---
+
+## Scenario 5: Log Work Time
+
+**Context:** Developer logs time spent on an issue.
+
+#### Step 1: Add Worklog
+
+*   **Action:** Log 2 hours of work.
+*   **Tool Used:** `add_worklog`
+*   **Command:**
+    ```
+    add_worklog(
+      issue_id="METRICO-5821",
+      duration=120,
+      text="Investigated and fixed memory leak"
+    )
+    ```
+*   **Expected Outcome:** Worklog entry created (duration in minutes).
+
+#### Step 2: View Issue Worklogs
+
+*   **Action:** Check all logged time on issue.
+*   **Tool Used:** `get_issue_worklogs`
+*   **Command:**
+    ```
+    get_issue_worklogs(issue_id="METRICO-5821")
+    ```
+*   **Expected Outcome:** Returns all work items with author, date, duration.
+
+---
+
+## Scenario 6: Find User's Project
+
+**Context:** Agent needs to determine which project to use.
+
+#### Step 1: Get Current User
+
+*   **Action:** Get user info (may include default project).
+*   **Tool Used:** `get_current_user`
+*   **Command:**
+    ```
+    get_current_user()
+    ```
+*   **Expected Outcome:** Returns user profile. If no default project, proceed to step 2.
+
+#### Step 2: List Projects (if needed)
+
+*   **Action:** List available projects.
+*   **Tool Used:** `list_projects`
+*   **Command:**
+    ```
+    list_projects()
+    ```
+*   **Expected Outcome:** Returns list of projects. Ask user to select one.
+
+---
+
+## Scenario 7: Get Correct Field Values
+
+**Context:** Agent needs to know valid values for State, Priority, etc.
+
+#### Step 1: Get Project Info
+
+*   **Action:** Retrieve project schema with field options.
+*   **Tool Used:** `get_project_info`
+*   **Command:**
+    ```
+    get_project_info(project_id="METRICO")
+    ```
+*   **Expected Outcome:** Returns custom fields with allowed values (e.g., State: [Open, In Progress, Fixed]).
+
+#### Step 2: Use Exact Value
+
+*   **Action:** Apply field change with correct value.
+*   **Tool Used:** `apply_command`
+*   **Command:**
+    ```
+    apply_command(issue_id="METRICO-5821", command="Priority Critical")
+    ```
+*   **Expected Outcome:** Field updated using exact value from allowed list.
+
+---
+
+## Scenario 8: Find Correct Username
+
+**Context:** Agent needs to assign issue but unsure of exact username.
+
+#### Step 1: Try Partial Match
+
+*   **Action:** Assign with partial name (auto-resolved).
+*   **Tool Used:** `update_issue`
+*   **Command:**
+    ```
+    update_issue(issue_id="METRICO-5821", assignee="john")
+    ```
+*   **Expected Outcome:** If single match, assigns automatically. If multiple/none, returns error.
+
+#### Step 2: List Project Users (if needed)
+
+*   **Action:** Get list of valid usernames.
+*   **Tool Used:** `get_project_users`
+*   **Command:**
+    ```
+    get_project_users(project_id="METRICO")
+    ```
+*   **Expected Outcome:** Returns all project members with login names.
