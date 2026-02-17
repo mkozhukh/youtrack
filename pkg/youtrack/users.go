@@ -80,7 +80,7 @@ func (c *Client) GetUserByLogin(ctx *YouTrackContext, login string) (*User, erro
 }
 
 func (c *Client) GetProjectUsers(ctx *YouTrackContext, projectID string, skip, top int) ([]*User, error) {
-	path := fmt.Sprintf("/api/admin/projects/%s/users", projectID)
+	path := fmt.Sprintf("/api/admin/projects/%s/team/users", projectID)
 
 	params := url.Values{}
 	params.Add("$skip", fmt.Sprintf("%d", skip))
