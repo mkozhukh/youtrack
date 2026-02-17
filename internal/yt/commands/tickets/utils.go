@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/mkozhukh/youtrack/pkg/youtrack"
@@ -114,65 +113,7 @@ func parseCustomFields(fields []string) ([]youtrack.CustomField, error) {
 
 // parseDuration parses a duration string like "1h 30m" or "90m" into minutes
 func parseDuration(durationStr string) (int, error) {
-	durationStr = strings.TrimSpace(durationStr)
-	if durationStr == "" {
-		return 0, fmt.Errorf("duration cannot be empty")
-	}
-
-	// Regular expression to match time units
-	re := regexp.MustCompile(`(\d+)\s*([hm]?)`)
-	matches := re.FindAllStringSubmatch(durationStr, -1)
-
-	if len(matches) == 0 {
-		return 0, fmt.Errorf("invalid duration format (examples: '1h', '30m', '1h 30m', '90m')")
-	}
-
-	totalMinutes := 0
-	usedUnits := make(map[string]bool)
-
-	for _, match := range matches {
-		if len(match) != 3 {
-			continue
-		}
-
-		valueStr := match[1]
-		unit := match[2]
-
-		// Default to minutes if no unit specified
-		if unit == "" {
-			unit = "m"
-		}
-
-		// Check for duplicate units
-		if usedUnits[unit] {
-			return 0, fmt.Errorf("duplicate time unit '%s' in duration", unit)
-		}
-		usedUnits[unit] = true
-
-		value, err := strconv.Atoi(valueStr)
-		if err != nil {
-			return 0, fmt.Errorf("invalid number '%s' in duration", valueStr)
-		}
-
-		if value < 0 {
-			return 0, fmt.Errorf("negative values not allowed in duration")
-		}
-
-		switch unit {
-		case "h":
-			totalMinutes += value * 60
-		case "m":
-			totalMinutes += value
-		default:
-			return 0, fmt.Errorf("invalid time unit '%s' (use 'h' for hours or 'm' for minutes)", unit)
-		}
-	}
-
-	if totalMinutes <= 0 {
-		return 0, fmt.Errorf("duration must be greater than 0")
-	}
-
-	return totalMinutes, nil
+	return youtrack.ParseDuration(durationStr)
 }
 
 // formatDuration formats minutes into a human-readable duration

@@ -137,7 +137,7 @@ func (c *Client) GetIssueWorklogs(ctx *YouTrackContext, issueID string) ([]*Work
 	path := fmt.Sprintf("/api/issues/%s/timeTracking/workItems", issueID)
 
 	query := url.Values{}
-	query.Add("fields", "id,date,duration,text,author(id,login,fullName,email),type(id,name)")
+	query.Add("fields", "id,date,duration(minutes,presentation),text,author(id,login,fullName,email),type(id,name)")
 
 	resp, err := c.Get(ctx, path, query)
 	if err != nil {
@@ -157,7 +157,7 @@ func (c *Client) AddIssueWorklog(ctx *YouTrackContext, issueID string, req *Crea
 	path := fmt.Sprintf("/api/issues/%s/timeTracking/workItems", issueID)
 
 	query := url.Values{}
-	query.Add("fields", "id,date,duration,text,author(id,login,fullName,email),type(id,name)")
+	query.Add("fields", "id,date,duration(minutes,presentation),text,author(id,login,fullName,email),type(id,name)")
 
 	resp, err := c.PostWithQuery(ctx, path, query, req)
 	if err != nil {

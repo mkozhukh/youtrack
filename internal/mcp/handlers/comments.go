@@ -74,7 +74,9 @@ func (h *CommentHandlers) AddCommentHandler(ctx context.Context, request mcp.Cal
 	details := fmt.Sprintf("Issue ID: %s\n", issueID)
 	details += fmt.Sprintf("Issue: %s\n", issue.Summary)
 	details += fmt.Sprintf("Comment ID: %s\n", comment.ID)
-	details += fmt.Sprintf("Author: %s\n", comment.Author.Login)
+	if comment.Author != nil {
+		details += fmt.Sprintf("Author: %s\n", comment.Author.Login)
+	}
 	details += fmt.Sprintf("Created: %s\n", comment.Created.Format("2006-01-02 15:04:05"))
 	details += fmt.Sprintf("\nComment text:\n%s", comment.Text)
 

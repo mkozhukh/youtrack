@@ -325,7 +325,7 @@ func formatUserWorklogs(user *youtrack.User, workItems []*youtrack.WorkItem) err
 
 	for _, item := range workItems {
 		// Format duration from minutes to human readable
-		duration := formatDuration(item.Duration)
+		duration := formatDuration(item.Duration.Minutes)
 
 		// Get issue ID if available
 		issueID := ""

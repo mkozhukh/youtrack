@@ -88,7 +88,7 @@ func addWorklog(cmd *cobra.Command, args []string) error {
 
 	// Create worklog request
 	req := &youtrack.CreateWorklogRequest{
-		Duration:    durationMinutes,
+		Duration:    youtrack.DurationValue{Minutes: durationMinutes},
 		Description: worklogDescription,
 	}
 

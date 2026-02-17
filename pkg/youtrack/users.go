@@ -149,7 +149,7 @@ func (c *Client) GetUserWorklogs(ctx *YouTrackContext, userID string, projectID 
 	params := url.Values{}
 	params.Add("$skip", fmt.Sprintf("%d", skip))
 	params.Add("$top", fmt.Sprintf("%d", top))
-	params.Add("fields", "id,date,duration,text,author(id,login,fullName,email),type(id,name),issue(idReadable,summary)")
+	params.Add("fields", "id,date,duration(minutes,presentation),text,author(id,login,fullName,email),type(id,name),issue(idReadable,summary)")
 
 	if projectID != "" {
 		params.Add("project", projectID)

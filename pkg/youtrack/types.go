@@ -3,6 +3,9 @@ package youtrack
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -168,14 +171,81 @@ type IssueTag struct {
 	Color YouTrackColor `json:"color,omitempty"`
 }
 
+// DurationValue represents a YouTrack duration period value
+type DurationValue struct {
+	Minutes      int    `json:"minutes"`
+	Presentation string `json:"presentation,omitempty"`
+}
+
+// ParseDuration parses a human-friendly duration string into minutes.
+// Supported units: w (weeks, 5 work days), d (days, 8 hours), h (hours), m (minutes).
+// Examples: "2d", "1h 30m", "1w 2d", "90m", "120" (plain number = minutes).
+func ParseDuration(s string) (int, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, fmt.Errorf("duration cannot be empty")
+	}
+
+	re := regexp.MustCompile(`(\d+)\s*([wdhm]?)`)
+	matches := re.FindAllStringSubmatch(s, -1)
+	if len(matches) == 0 {
+		return 0, fmt.Errorf("invalid duration format (examples: '1h', '30m', '2d', '1w')")
+	}
+
+	totalMinutes := 0
+	usedUnits := make(map[string]bool)
+
+	for _, match := range matches {
+		if len(match) != 3 {
+			continue
+		}
+		valueStr := match[1]
+		unit := match[2]
+		if unit == "" {
+			unit = "m"
+		}
+		if usedUnits[unit] {
+			return 0, fmt.Errorf("duplicate time unit '%s' in duration", unit)
+		}
+		usedUnits[unit] = true
+
+		value, err := strconv.Atoi(valueStr)
+		if err != nil {
+			return 0, fmt.Errorf("invalid number '%s' in duration", valueStr)
+		}
+		if value < 0 {
+			return 0, fmt.Errorf("negative values not allowed in duration")
+		}
+
+		switch unit {
+		case "w":
+			totalMinutes += value * 5 * 8 * 60
+		case "d":
+			totalMinutes += value * 8 * 60
+		case "h":
+			totalMinutes += value * 60
+		case "m":
+			totalMinutes += value
+		default:
+			return 0, fmt.Errorf("invalid time unit '%s' (use 'w' for weeks, 'd' for days, 'h' for hours, or 'm' for minutes)", unit)
+		}
+	}
+
+	if totalMinutes <= 0 {
+		return 0, fmt.Errorf("duration must be greater than 0")
+	}
+
+	return totalMinutes, nil
+}
+
 type WorkItem struct {
-	ID          string       `json:"id"`
-	Author      *User        `json:"author,omitempty"`
-	Date        YouTrackTime `json:"date"`
-	Duration    int          `json:"duration"` // Duration in minutes
-	Description string       `json:"text,omitempty"`
-	Type        *WorkType    `json:"type,omitempty"`
-	Issue       *Issue       `json:"issue,omitempty"`
+	ID          string        `json:"id"`
+	Author      *User         `json:"author,omitempty"`
+	Date        YouTrackTime  `json:"date"`
+	Duration    DurationValue `json:"duration"`
+	Description string        `json:"text,omitempty"`
+	Type        *WorkType     `json:"type,omitempty"`
+	Issue       *Issue        `json:"issue,omitempty"`
 }
 
 type WorkType struct {
@@ -194,7 +264,7 @@ type Attachment struct {
 }
 
 type CreateWorklogRequest struct {
-	Duration    int              `json:"duration"` // Duration in minutes
+	Duration    DurationValue    `json:"duration"`
 	Description string           `json:"text,omitempty"`
 	Date        *int64           `json:"date,omitempty"` // Unix epoch milliseconds
 	Type        *WorkTypeRequest `json:"type,omitempty"`

@@ -453,7 +453,7 @@ func formatWorklogsList(data interface{}) error {
 		date := worklog.Date.Time.Format("2006-01-02")
 
 		// Format duration
-		duration := formatDuration(worklog.Duration)
+		duration := formatDuration(worklog.Duration.Minutes)
 
 		// Truncate description if too long for table display
 		description := worklog.Description
@@ -496,7 +496,7 @@ func formatWorklogAdded(data interface{}) error {
 	}
 
 	fmt.Printf("Date:     %s\n", worklog.Date.Time.Format("2006-01-02"))
-	fmt.Printf("Duration: %s\n", formatDuration(worklog.Duration))
+	fmt.Printf("Duration: %s\n", formatDuration(worklog.Duration.Minutes))
 
 	if worklog.Description != "" {
 		fmt.Printf("Description: %s\n", worklog.Description)

@@ -42,13 +42,16 @@ func (h *WorklogHandlers) AddWorklogHandler(ctx context.Context, request mcp.Cal
 		return h.errorHandler.FormatValidationError("issue_id", err), nil
 	}
 
-	args := request.GetArguments()
-	durationFloat, ok := args["duration"].(float64)
-	if !ok || durationFloat <= 0 {
-		return mcp.NewToolResultError("duration is required and must be a positive number (minutes)"), nil
+	durationStr, err := request.RequireString("duration")
+	if err != nil {
+		return h.errorHandler.FormatValidationError("duration", err), nil
 	}
-	duration := int(durationFloat)
+	duration, err := youtrack.ParseDuration(durationStr)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Invalid duration '%s': %v", durationStr, err)), nil
+	}
 
+	args := request.GetArguments()
 	text, _ := args["text"].(string)
 	dateStr, _ := args["date"].(string)
 	workType, _ := args["work_type"].(string)
@@ -64,7 +67,7 @@ func (h *WorklogHandlers) AddWorklogHandler(ctx context.Context, request mcp.Cal
 	}
 
 	req := &youtrack.CreateWorklogRequest{
-		Duration:    duration,
+		Duration:    youtrack.DurationValue{Minutes: duration},
 		Description: text,
 	}
 
@@ -90,7 +93,7 @@ func (h *WorklogHandlers) AddWorklogHandler(ctx context.Context, request mcp.Cal
 
 	response := fmt.Sprintf("Worklog added successfully!\n\n")
 	response += fmt.Sprintf("- Issue: %s\n", issueID)
-	response += fmt.Sprintf("- Duration: %s\n", formatDuration(workItem.Duration))
+	response += fmt.Sprintf("- Duration: %s\n", formatDuration(workItem.Duration.Minutes))
 	response += fmt.Sprintf("- Date: %s\n", workItem.Date.Format("2006-01-02"))
 	if workItem.Description != "" {
 		response += fmt.Sprintf("- Description: %s\n", workItem.Description)
@@ -193,8 +196,8 @@ func (h *WorklogHandlers) formatWorklogs(worklogs []*youtrack.WorkItem, issueID 
 
 	totalMinutes := 0
 	for _, wl := range worklogs {
-		totalMinutes += wl.Duration
-		sb.WriteString(fmt.Sprintf("- %s | %s", wl.Date.Format("2006-01-02"), formatDuration(wl.Duration)))
+		totalMinutes += wl.Duration.Minutes
+		sb.WriteString(fmt.Sprintf("- %s | %s", wl.Date.Format("2006-01-02"), formatDuration(wl.Duration.Minutes)))
 		if wl.Author != nil {
 			sb.WriteString(fmt.Sprintf(" | %s", wl.Author.Login))
 		}
@@ -218,8 +221,8 @@ func (h *WorklogHandlers) formatUserWorklogs(worklogs []*youtrack.WorkItem, user
 
 	totalMinutes := 0
 	for _, wl := range worklogs {
-		totalMinutes += wl.Duration
-		sb.WriteString(fmt.Sprintf("- %s | %s", wl.Date.Format("2006-01-02"), formatDuration(wl.Duration)))
+		totalMinutes += wl.Duration.Minutes
+		sb.WriteString(fmt.Sprintf("- %s | %s", wl.Date.Format("2006-01-02"), formatDuration(wl.Duration.Minutes)))
 		if wl.Issue != nil {
 			sb.WriteString(fmt.Sprintf(" | %s", wl.Issue.ID))
 		}

@@ -29,11 +29,14 @@ func (c *Client) GetIssueComments(ctx *YouTrackContext, issueID string) ([]*Issu
 func (c *Client) AddIssueComment(ctx *YouTrackContext, issueID string, text string) (*IssueComment, error) {
 	path := fmt.Sprintf("/api/issues/%s/comments", issueID)
 
+	query := url.Values{}
+	query.Add("fields", "id,text,created,updated,author(id,login,fullName,email)")
+
 	req := map[string]string{
 		"text": text,
 	}
 
-	resp, err := c.Post(ctx, path, req)
+	resp, err := c.PostWithQuery(ctx, path, query, req)
 	if err != nil {
 		return nil, err
 	}
@@ -50,11 +53,14 @@ func (c *Client) AddIssueComment(ctx *YouTrackContext, issueID string, text stri
 func (c *Client) UpdateIssueComment(ctx *YouTrackContext, issueID, commentID string, text string) (*IssueComment, error) {
 	path := fmt.Sprintf("/api/issues/%s/comments/%s", issueID, commentID)
 
+	query := url.Values{}
+	query.Add("fields", "id,text,created,updated,author(id,login,fullName,email)")
+
 	req := map[string]string{
 		"text": text,
 	}
 
-	resp, err := c.Post(ctx, path, req)
+	resp, err := c.PostWithQuery(ctx, path, query, req)
 	if err != nil {
 		return nil, err
 	}
