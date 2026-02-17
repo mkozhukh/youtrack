@@ -47,6 +47,12 @@ type Config struct {
 	Tracker struct {
 		FilePath string `koanf:"file_path"`
 	} `koanf:"tracker"`
+	FileServer struct {
+		Enabled       bool   `koanf:"enabled"`
+		BaseURL       string `koanf:"base_url"`
+		TTLSeconds    int    `koanf:"ttl_seconds"`
+		MaxFileSizeMB int    `koanf:"max_file_size_mb"`
+	} `koanf:"fileserver"`
 }
 
 var (
@@ -90,6 +96,10 @@ func loadConfig() error {
 		"youtrack.max_results":        10,
 		"cache.ttl_seconds":           300,
 		"tracker.file_path":           "projects.json",
+		"fileserver.enabled":          false,
+		"fileserver.base_url":         "",
+		"fileserver.ttl_seconds":      1800,
+		"fileserver.max_file_size_mb": 50,
 	}
 
 	if err := k.Load(confmap.Provider(defaults, "."), nil); err != nil {
@@ -150,6 +160,12 @@ func run(cmd *cobra.Command, args []string, useHTTP bool) error {
 		},
 		Tracker: mcp.TrackerConfig{
 			FilePath: config.Tracker.FilePath,
+		},
+		FileServer: mcp.FileServerConfig{
+			Enabled:       config.FileServer.Enabled,
+			BaseURL:       config.FileServer.BaseURL,
+			TTLSeconds:    config.FileServer.TTLSeconds,
+			MaxFileSizeMB: config.FileServer.MaxFileSizeMB,
 		},
 		Logging: logging.LogConfig{
 			Enabled:          config.Logging.Enabled,

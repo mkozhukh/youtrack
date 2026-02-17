@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mkozhukh/youtrack/internal/mcp/cache"
+	"github.com/mkozhukh/youtrack/internal/mcp/filestore"
 	"github.com/mkozhukh/youtrack/internal/mcp/handlers"
 	"github.com/mkozhukh/youtrack/internal/mcp/logging"
 	"github.com/mkozhukh/youtrack/internal/mcp/tools"
@@ -36,6 +37,14 @@ type TrackerConfig struct {
 	FilePath string
 }
 
+// FileServerConfig holds the file server configuration
+type FileServerConfig struct {
+	Enabled       bool   `koanf:"enabled"`
+	BaseURL       string `koanf:"base_url"`
+	TTLSeconds    int    `koanf:"ttl_seconds"`
+	MaxFileSizeMB int    `koanf:"max_file_size_mb"`
+}
+
 // ServerConfig holds the MCP server configuration
 type ServerConfig struct {
 	Name          string         `koanf:"name"`
@@ -43,6 +52,7 @@ type ServerConfig struct {
 	YouTrack      YouTrackConfig `koanf:"youtrack"`
 	Cache         CacheConfig
 	Tracker       TrackerConfig
+	FileServer    FileServerConfig
 	Logging       logging.LogConfig
 	ToolBlacklist []string
 }
@@ -55,6 +65,7 @@ type MCPServer struct {
 	cachedClient       *cache.CachedClient
 	appLogger          *logging.AppLogger
 	toolLogger         func(string, map[string]interface{})
+	fileStore          *filestore.Store
 	issueHandlers      *handlers.IssueHandlers
 	tagHandlers        *handlers.TagHandlers
 	commentHandlers    *handlers.CommentHandlers
@@ -129,6 +140,21 @@ func NewMCPServer(config ServerConfig, toolLogger func(string, map[string]interf
 		log.Info("Project tracker initialized", "file", config.Tracker.FilePath)
 	}
 
+	// Create file store if enabled
+	var store *filestore.Store
+	if config.FileServer.Enabled {
+		ttl := time.Duration(config.FileServer.TTLSeconds) * time.Second
+		maxSize := config.FileServer.MaxFileSizeMB
+		if maxSize == 0 {
+			maxSize = 50
+		}
+		store, err = filestore.NewStore(ttl, maxSize)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create file store: %w", err)
+		}
+		log.Info("File server enabled", "ttl", ttl, "max_size_mb", maxSize)
+	}
+
 	// Create issue handlers
 	issueHandlers := handlers.NewIssueHandlers(ytClient, wrappedToolLogger, contextTracker)
 
@@ -152,7 +178,16 @@ func NewMCPServer(config ServerConfig, toolLogger func(string, map[string]interf
 	linkHandlers := handlers.NewLinkHandlers(ytClient, wrappedToolLogger)
 
 	// Create attachment handlers
-	attachmentHandlers := handlers.NewAttachmentHandlers(ytClient, wrappedToolLogger)
+	var attachmentHandlers *handlers.AttachmentHandlers
+	if store != nil {
+		fileBaseURL := config.FileServer.BaseURL
+		if fileBaseURL == "" {
+			fileBaseURL = fmt.Sprintf("http://localhost:%d", config.Port)
+		}
+		attachmentHandlers = handlers.NewAttachmentHandlersWithFileStore(ytClient, wrappedToolLogger, store, fileBaseURL)
+	} else {
+		attachmentHandlers = handlers.NewAttachmentHandlers(ytClient, wrappedToolLogger)
+	}
 
 	// Create command handlers
 	commandHandlers := handlers.NewCommandHandlers(ytClient, wrappedToolLogger)
@@ -170,6 +205,7 @@ func NewMCPServer(config ServerConfig, toolLogger func(string, map[string]interf
 		cachedClient:       cachedClient,
 		appLogger:          appLogger,
 		toolLogger:         toolLogger,
+		fileStore:          store,
 		issueHandlers:      issueHandlers,
 		tagHandlers:        tagHandlers,
 		commentHandlers:    commentHandlers,
@@ -211,6 +247,12 @@ func (s *MCPServer) addTool(tool mcp.Tool, handler server.ToolHandlerFunc) {
 
 // RegisterTools registers all YouTrack-related tools with the MCP server
 func (s *MCPServer) RegisterTools() error {
+	// Resolve file server base URL for embedding in tool descriptions
+	var fileBaseURL string
+	if s.attachmentHandlers.FileServerEnabled() {
+		fileBaseURL = s.attachmentHandlers.GetFileBaseURL()
+	}
+
 	// Register issue management tools
 	s.addTool(tools.GetIssueListTool(), s.issueHandlers.GetIssueListHandler)
 	s.addTool(tools.GetIssueDetailsTool(), s.issueHandlers.GetIssueDetailsHandler)
@@ -240,8 +282,15 @@ func (s *MCPServer) RegisterTools() error {
 
 	// Register attachment management tools
 	s.addTool(tools.GetIssueAttachmentsTool(), s.attachmentHandlers.GetIssueAttachmentsHandler)
-	s.addTool(tools.GetIssueAttachmentContentTool(), s.attachmentHandlers.GetIssueAttachmentContentHandler)
-	s.addTool(tools.UploadAttachmentTool(), s.attachmentHandlers.UploadAttachmentHandler)
+	s.addTool(tools.GetIssueAttachmentContentTool(fileBaseURL), s.attachmentHandlers.GetIssueAttachmentContentHandler)
+
+	if fileBaseURL != "" {
+		// File server mode: upload via file_id, description includes full URL
+		s.addTool(tools.UploadAttachmentTool(fileBaseURL), s.attachmentHandlers.UploadAttachmentHandler)
+	} else {
+		// No file server: register base64 upload tool
+		s.addTool(tools.UploadAttachmentBase64Tool(), s.attachmentHandlers.UploadAttachmentHandler)
+	}
 
 	// Register command tools
 	s.addTool(tools.ApplyCommandTool(), s.commandHandlers.ApplyCommandHandler)
@@ -286,6 +335,10 @@ func CORSMiddleware(next http.Handler) http.Handler {
 
 // ServeHTTP starts the MCP server using StreamableHTTP transport
 func (s *MCPServer) ServeHTTP() error {
+	if s.fileStore != nil {
+		defer s.fileStore.Close()
+	}
+
 	// Create StreamableHTTP server
 	streamableServer := server.NewStreamableHTTPServer(s.server)
 
@@ -294,6 +347,13 @@ func (s *MCPServer) ServeHTTP() error {
 
 	// Add health endpoint
 	http.HandleFunc("/health", s.healthHandlers.HealthCheckHTTPHandler)
+
+	// Add file server routes if enabled
+	if s.fileStore != nil {
+		http.HandleFunc("/mcpfiles/", filestore.ServeFile(s.fileStore))
+		http.HandleFunc("/mcpfiles", filestore.UploadFile(s.fileStore))
+		log.Info("File server routes registered on MCP port")
+	}
 
 	// Start HTTP server
 	addr := fmt.Sprintf(":%d", s.config.Port)

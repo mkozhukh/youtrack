@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"os"
 	"strings"
-	"unicode/utf8"
 
+	"github.com/mkozhukh/youtrack/internal/mcp/filestore"
 	"github.com/mkozhukh/youtrack/pkg/youtrack"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -17,6 +18,8 @@ type AttachmentHandlers struct {
 	ytClient     AttachmentClient
 	toolLogger   func(string, map[string]interface{})
 	errorHandler *ErrorHandler
+	fileStore    *filestore.Store
+	fileBaseURL  string
 }
 
 // AttachmentClient defines the interface for YouTrack client operations needed for attachment management
@@ -33,6 +36,27 @@ func NewAttachmentHandlers(ytClient AttachmentClient, toolLogger func(string, ma
 		toolLogger:   toolLogger,
 		errorHandler: NewErrorHandler(),
 	}
+}
+
+// NewAttachmentHandlersWithFileStore creates AttachmentHandlers with file server support
+func NewAttachmentHandlersWithFileStore(ytClient AttachmentClient, toolLogger func(string, map[string]interface{}), store *filestore.Store, baseURL string) *AttachmentHandlers {
+	return &AttachmentHandlers{
+		ytClient:     ytClient,
+		toolLogger:   toolLogger,
+		errorHandler: NewErrorHandler(),
+		fileStore:    store,
+		fileBaseURL:  baseURL,
+	}
+}
+
+// FileServerEnabled returns true if the file server sidecar is active
+func (h *AttachmentHandlers) FileServerEnabled() bool {
+	return h.fileStore != nil
+}
+
+// GetFileBaseURL returns the public base URL for the file server.
+func (h *AttachmentHandlers) GetFileBaseURL() string {
+	return h.fileBaseURL
 }
 
 // GetIssueAttachmentsHandler handles the get_issue_attachments tool call
@@ -76,7 +100,9 @@ func (h *AttachmentHandlers) GetIssueAttachmentsHandler(ctx context.Context, req
 	return mcp.NewToolResultText(sb.String()), nil
 }
 
-// GetIssueAttachmentContentHandler handles the get_issue_attachment_content tool call
+// GetIssueAttachmentContentHandler handles the get_issue_attachment_content tool call.
+// When the file server is enabled, it downloads content from YouTrack and stores it in the
+// file store, returning a local HTTP URL. When disabled, it returns the YouTrack attachment URL.
 func (h *AttachmentHandlers) GetIssueAttachmentContentHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	issueID, err := request.RequireString("issue_id")
 	if err != nil {
@@ -95,35 +121,143 @@ func (h *AttachmentHandlers) GetIssueAttachmentContentHandler(ctx context.Contex
 		})
 	}
 
+	if h.fileStore != nil {
+		return h.getAttachmentContentViaFileStore(ctx, issueID, attachmentID)
+	}
+
+	return h.getAttachmentContentURL(ctx, issueID, attachmentID)
+}
+
+// getAttachmentContentViaFileStore downloads content from YT, stores in filestore, returns local URL
+func (h *AttachmentHandlers) getAttachmentContentViaFileStore(ctx context.Context, issueID, attachmentID string) (*mcp.CallToolResult, error) {
+	// Get attachment metadata first to know the filename
+	attachments, err := h.ytClient.GetIssueAttachments(ctx, issueID)
+	if err != nil {
+		return h.errorHandler.HandleError(err, "retrieving attachment metadata"), nil
+	}
+
+	var filename string
+	for _, att := range attachments {
+		if att.ID == attachmentID {
+			filename = att.Name
+			break
+		}
+	}
+	if filename == "" {
+		filename = attachmentID
+	}
+
+	// Download the content
 	data, err := h.ytClient.GetIssueAttachmentContent(ctx, issueID, attachmentID)
 	if err != nil {
 		return h.errorHandler.HandleError(err, "downloading attachment content"), nil
 	}
 
-	// If valid UTF-8 text, return as text; otherwise base64 encode
-	if utf8.Valid(data) {
-		return mcp.NewToolResultText(string(data)), nil
+	// Store in file store
+	fileID, err := h.fileStore.Put(data, filename)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to store file: %v", err)), nil
 	}
 
-	encoded := base64.StdEncoding.EncodeToString(data)
-	return mcp.NewToolResultText(fmt.Sprintf("[base64-encoded binary content (%d bytes)]\n%s", len(data), encoded)), nil
+	url := fmt.Sprintf("%s/mcpfiles/%s", h.fileBaseURL, fileID)
+	response := fmt.Sprintf("Attachment available for download:\n\n")
+	response += fmt.Sprintf("- Name: %s\n", filename)
+	response += fmt.Sprintf("- Size: %d bytes\n", len(data))
+	response += fmt.Sprintf("- URL: %s\n", url)
+
+	return mcp.NewToolResultText(response), nil
 }
 
-// UploadAttachmentHandler handles the upload_attachment tool call
+// getAttachmentContentURL returns the YouTrack native URL for the attachment
+func (h *AttachmentHandlers) getAttachmentContentURL(ctx context.Context, issueID, attachmentID string) (*mcp.CallToolResult, error) {
+	attachments, err := h.ytClient.GetIssueAttachments(ctx, issueID)
+	if err != nil {
+		return h.errorHandler.HandleError(err, "retrieving attachment metadata"), nil
+	}
+
+	for _, att := range attachments {
+		if att.ID == attachmentID {
+			response := fmt.Sprintf("Attachment download URL:\n\n")
+			response += fmt.Sprintf("- Name: %s\n", att.Name)
+			response += fmt.Sprintf("- Size: %d bytes\n", att.Size)
+			if att.MimeType != "" {
+				response += fmt.Sprintf("- Type: %s\n", att.MimeType)
+			}
+			response += fmt.Sprintf("- URL: %s\n", att.URL)
+			return mcp.NewToolResultText(response), nil
+		}
+	}
+
+	return mcp.NewToolResultError(fmt.Sprintf("Attachment %s not found on issue %s", attachmentID, issueID)), nil
+}
+
+// UploadAttachmentHandler handles the upload_attachment tool call.
+// When the file server is enabled, it reads the file from the store by file_id.
+// When disabled, it accepts base64-encoded content directly.
 func (h *AttachmentHandlers) UploadAttachmentHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	issueID, err := request.RequireString("issue_id")
 	if err != nil {
 		return h.errorHandler.FormatValidationError("issue_id", err), nil
 	}
 
-	contentB64, err := request.RequireString("content")
-	if err != nil {
-		return h.errorHandler.FormatValidationError("content", err), nil
-	}
-
 	filename, err := request.RequireString("filename")
 	if err != nil {
 		return h.errorHandler.FormatValidationError("filename", err), nil
+	}
+
+	if h.fileStore != nil {
+		return h.uploadAttachmentFromFileStore(ctx, request, issueID, filename)
+	}
+
+	return h.uploadAttachmentFromBase64(ctx, request, issueID, filename)
+}
+
+// uploadAttachmentFromFileStore reads file from store and uploads to YT
+func (h *AttachmentHandlers) uploadAttachmentFromFileStore(ctx context.Context, request mcp.CallToolRequest, issueID, filename string) (*mcp.CallToolResult, error) {
+	fileID, err := request.RequireString("file_id")
+	if err != nil {
+		return h.errorHandler.FormatValidationError("file_id", err), nil
+	}
+
+	if h.toolLogger != nil {
+		h.toolLogger("upload_attachment", map[string]interface{}{
+			"issue_id": issueID,
+			"filename": filename,
+			"file_id":  fileID,
+		})
+	}
+
+	filePath, _, _, err := h.fileStore.Get(fileID)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to retrieve file from store: %v", err)), nil
+	}
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to read stored file: %v", err)), nil
+	}
+
+	attachment, err := h.ytClient.AddIssueAttachmentFromBytes(ctx, issueID, content, filename)
+	if err != nil {
+		return h.errorHandler.HandleError(err, "uploading attachment"), nil
+	}
+
+	response := fmt.Sprintf("Attachment uploaded successfully!\n\n")
+	response += fmt.Sprintf("- Name: %s\n", attachment.Name)
+	response += fmt.Sprintf("- ID: %s\n", attachment.ID)
+	response += fmt.Sprintf("- Size: %d bytes\n", attachment.Size)
+	if attachment.MimeType != "" {
+		response += fmt.Sprintf("- Type: %s\n", attachment.MimeType)
+	}
+
+	return mcp.NewToolResultText(response), nil
+}
+
+// uploadAttachmentFromBase64 decodes base64 content and uploads to YT (legacy mode)
+func (h *AttachmentHandlers) uploadAttachmentFromBase64(ctx context.Context, request mcp.CallToolRequest, issueID, filename string) (*mcp.CallToolResult, error) {
+	contentB64, err := request.RequireString("content")
+	if err != nil {
+		return h.errorHandler.FormatValidationError("content", err), nil
 	}
 
 	if h.toolLogger != nil {

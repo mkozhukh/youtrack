@@ -40,6 +40,20 @@ ttl_seconds = 300
 # File path for storing last used project per user
 file_path = "projects.json"
 
+[fileserver]
+# Enable the file server for attachment handling (HTTP mode only)
+# When enabled, attachments are exchanged via HTTP URLs instead of base64 in context
+# Routes /mcpfiles and /mcpfiles/{id} are added to the MCP server port
+enabled = false
+# Public base URL for the file server (used in tool descriptions and download links)
+# Set this to the externally reachable URL when running behind a reverse proxy or in Docker
+# If empty, defaults to http://localhost:{server.port}
+base_url = ""
+# How long uploaded/downloaded files are kept before cleanup (seconds)
+ttl_seconds = 1800
+# Maximum upload file size in MB
+max_file_size_mb = 50
+
 [tools]
 # Blacklist tools by name to prevent them from being registered
 # Example: blacklist = ["delete_issue", "untag_issue"]

@@ -7,6 +7,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 )
@@ -15,7 +16,10 @@ import (
 func (c *Client) GetIssueAttachments(ctx *YouTrackContext, issueID string) ([]*Attachment, error) {
 	path := fmt.Sprintf("/api/issues/%s/attachments", issueID)
 
-	resp, err := c.Get(ctx, path, nil)
+	query := url.Values{}
+	query.Add("fields", "id,name,size,created,mimeType,url,author(id,login,fullName)")
+
+	resp, err := c.Get(ctx, path, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get issue attachments: %w", err)
 	}
