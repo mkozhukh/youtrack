@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strings"
 )
 
 func (c *Client) GetIssueTags(ctx *YouTrackContext, issueID string) ([]*IssueTag, error) {
@@ -98,9 +99,8 @@ func (c *Client) CreateTag(ctx *YouTrackContext, name string, color string) (*Ta
 
 func (c *Client) GetTagByName(ctx *YouTrackContext, name string) (*Tag, error) {
 	query := url.Values{}
-	query.Add("$top", "1")
 	query.Add("fields", "id,name,color")
-	query.Add("query", fmt.Sprintf("name:%s", name))
+	query.Add("query", name)
 
 	resp, err := c.Get(ctx, "/api/tags", query)
 	if err != nil {
@@ -113,11 +113,15 @@ func (c *Client) GetTagByName(ctx *YouTrackContext, name string) (*Tag, error) {
 		return nil, fmt.Errorf("failed to decode tags: %w", err)
 	}
 
-	if len(tags) == 0 {
-		return nil, fmt.Errorf("tag with name '%s' not found", name)
+	// Exact match since query may return partial matches
+	lowercaseName := strings.ToLower(name)
+	for _, tag := range tags {
+		if strings.ToLower(tag.Name) == lowercaseName {
+			return tag, nil
+		}
 	}
 
-	return tags[0], nil
+	return nil, fmt.Errorf("tag with name '%s' not found", name)
 }
 
 func (c *Client) EnsureTag(ctx *YouTrackContext, name string, color string) (string, error) {

@@ -144,24 +144,23 @@ func (c *Client) SuggestUserByProject(ctx *YouTrackContext, projectID string, us
 }
 
 func (c *Client) GetUserWorklogs(ctx *YouTrackContext, userID string, projectID string, startDate, endDate string, skip, top int) ([]*WorkItem, error) {
-	path := fmt.Sprintf("/api/users/%s/timeTracking/workItems", userID)
-
 	params := url.Values{}
 	params.Add("$skip", fmt.Sprintf("%d", skip))
 	params.Add("$top", fmt.Sprintf("%d", top))
 	params.Add("fields", "id,date,duration(minutes,presentation),text,author(id,login,fullName,email),type(id,name),issue(idReadable,summary)")
+	params.Add("author", userID)
 
 	if projectID != "" {
-		params.Add("project", projectID)
+		params.Add("query", fmt.Sprintf("project:{%s}", projectID))
 	}
 	if startDate != "" {
-		params.Add("start", startDate)
+		params.Add("startDate", startDate)
 	}
 	if endDate != "" {
-		params.Add("end", endDate)
+		params.Add("endDate", endDate)
 	}
 
-	resp, err := c.Get(ctx, path, params)
+	resp, err := c.Get(ctx, "/api/workItems", params)
 	if err != nil {
 		return nil, err
 	}
