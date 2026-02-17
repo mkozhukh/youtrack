@@ -263,7 +263,18 @@ func tagTicket(cmd *cobra.Command, args []string) error {
 
 	// Add each tag
 	for i, tagName := range tagNames {
-		err := client.AddIssueTag(ctx, ticketID, tagName)
+		tagID, err := client.EnsureTag(ctx, tagName, "")
+		if err != nil {
+			summary.Results[i] = TagOperationResult{
+				TagName: tagName,
+				Success: false,
+				Error:   err.Error(),
+			}
+			summary.HasErrors = true
+			log.Error("Failed to ensure tag", "ticketID", ticketID, "tag", tagName, "error", err)
+			continue
+		}
+		err = client.AddIssueTag(ctx, ticketID, tagID)
 		result := TagOperationResult{
 			TagName: tagName,
 			Success: err == nil,
@@ -318,7 +329,18 @@ func untagTicket(cmd *cobra.Command, args []string) error {
 
 	// Remove each tag
 	for i, tagName := range tagNames {
-		err := client.RemoveIssueTag(ctx, ticketID, tagName)
+		tag, err := client.GetTagByName(ctx, tagName)
+		if err != nil {
+			summary.Results[i] = TagOperationResult{
+				TagName: tagName,
+				Success: false,
+				Error:   err.Error(),
+			}
+			summary.HasErrors = true
+			log.Error("Failed to find tag", "ticketID", ticketID, "tag", tagName, "error", err)
+			continue
+		}
+		err = client.RemoveIssueTag(ctx, ticketID, tag.ID)
 		result := TagOperationResult{
 			TagName: tagName,
 			Success: err == nil,

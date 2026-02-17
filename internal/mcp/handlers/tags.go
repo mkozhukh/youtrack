@@ -21,8 +21,9 @@ type TagHandlers struct {
 // YTClient defines the interface for YouTrack client operations needed for tag management
 type YTClient interface {
 	EnsureTag(ctx context.Context, tagName string, color string) (string, error)
-	AddIssueTag(ctx context.Context, issueID string, tagName string) error
-	RemoveIssueTag(ctx context.Context, issueID string, tagName string) error
+	AddIssueTag(ctx context.Context, issueID string, tagID string) error
+	RemoveIssueTag(ctx context.Context, issueID string, tagID string) error
+	GetTagByName(ctx context.Context, name string) (*youtrack.Tag, error)
 	GetIssue(ctx context.Context, issueID string) (*youtrack.Issue, error)
 	ListTags(ctx context.Context, skip, top int) ([]*youtrack.Tag, error)
 }
@@ -69,7 +70,7 @@ func (h *TagHandlers) TagIssueHandler(ctx context.Context, request mcp.CallToolR
 	}
 
 	// Add the tag to the issue
-	err = h.ytClient.AddIssueTag(ctx, issueID, tagName)
+	err = h.ytClient.AddIssueTag(ctx, issueID, tagID)
 	if err != nil {
 		return h.errorHandler.HandleError(err, "adding tag to issue"), nil
 	}
@@ -115,8 +116,14 @@ func (h *TagHandlers) UntagIssueHandler(ctx context.Context, request mcp.CallToo
 		})
 	}
 
+	// Look up the tag ID
+	tag, err := h.ytClient.GetTagByName(ctx, tagName)
+	if err != nil {
+		return h.errorHandler.HandleError(err, "finding tag"), nil
+	}
+
 	// Remove the tag from the issue
-	err = h.ytClient.RemoveIssueTag(ctx, issueID, tagName)
+	err = h.ytClient.RemoveIssueTag(ctx, issueID, tag.ID)
 	if err != nil {
 		return h.errorHandler.HandleError(err, "removing tag from issue"), nil
 	}

@@ -40,9 +40,41 @@ type Issue struct {
 	Updated     YouTrackTime  `json:"updated"`
 	Resolved    *YouTrackTime `json:"resolved,omitempty"`
 	Reporter    *User         `json:"reporter,omitempty"`
-	UpdatedBy   *User         `json:"updatedBy,omitempty"`
-	Assignee    *User         `json:"assignee,omitempty"`
+	UpdatedBy   *User         `json:"updater,omitempty"`
+	Assignee    *User         `json:"-"` // extracted from customFields
 	Tags        []*IssueTag   `json:"tags,omitempty"`
+}
+
+// UnmarshalJSON custom unmarshals Issue, extracting Assignee from customFields
+func (i *Issue) UnmarshalJSON(data []byte) error {
+	type IssueAlias Issue
+	aux := &struct {
+		*IssueAlias
+		CustomFields []json.RawMessage `json:"customFields,omitempty"`
+	}{
+		IssueAlias: (*IssueAlias)(i),
+	}
+
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+
+	for _, raw := range aux.CustomFields {
+		var field struct {
+			Name  string `json:"name"`
+			Type  string `json:"$type"`
+			Value *User  `json:"value"`
+		}
+		if err := json.Unmarshal(raw, &field); err != nil {
+			continue
+		}
+		if field.Name == "Assignee" && field.Value != nil && field.Value.Login != "" {
+			i.Assignee = field.Value
+			break
+		}
+	}
+
+	return nil
 }
 
 type User struct {

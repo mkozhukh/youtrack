@@ -10,7 +10,7 @@ func (c *Client) GetIssue(ctx *YouTrackContext, issueID string) (*Issue, error) 
 	path := fmt.Sprintf("/api/issues/%s", issueID)
 
 	query := url.Values{}
-	query.Add("fields", "idReadable,summary,description,created,updated,resolved,reporter(id,login,fullName,email),updatedBy(id,login,fullName,email),assignee(id,login,fullName,email),tags(id,name,color)")
+	query.Add("fields", "idReadable,summary,description,created,updated,resolved,reporter(id,login,fullName,email),updater(id,login,fullName,email),customFields(name,$type,value(id,name,login,fullName)),tags(id,name,color)")
 
 	resp, err := c.Get(ctx, path, query)
 	if err != nil {
@@ -29,7 +29,7 @@ func (c *Client) GetIssue(ctx *YouTrackContext, issueID string) (*Issue, error) 
 func (c *Client) CreateIssue(ctx *YouTrackContext, req *CreateIssueRequest) (*Issue, error) {
 	// Add fields parameter to get the full issue details in response
 	query := url.Values{}
-	query.Add("fields", "idReadable,summary,description,created,updated,resolved,reporter(id,login,fullName,email),updatedBy(id,login,fullName,email),assignee(id,login,fullName,email),tags(id,name,color)")
+	query.Add("fields", "idReadable,summary,description,created,updated,resolved,reporter(id,login,fullName,email),updater(id,login,fullName,email),customFields(name,$type,value(id,name,login,fullName)),tags(id,name,color)")
 
 	resp, err := c.PostWithQuery(ctx, "/api/issues", query, req)
 	if err != nil {
@@ -117,7 +117,7 @@ func (c *Client) SearchIssues(ctx *YouTrackContext, query string, skip, top int)
 	params.Add("query", query)
 	params.Add("$skip", fmt.Sprintf("%d", skip))
 	params.Add("$top", fmt.Sprintf("%d", top))
-	params.Add("fields", "idReadable,summary,description,created,updated,resolved,reporter(id,login,fullName,email),updatedBy(id,login,fullName,email),assignee(id,login,fullName,email),tags(id,name,color)")
+	params.Add("fields", "idReadable,summary,description,created,updated,resolved,reporter(id,login,fullName,email),updater(id,login,fullName,email),customFields(name,$type,value(id,name,login,fullName)),tags(id,name,color)")
 
 	resp, err := c.Get(ctx, "/api/issues", params)
 	if err != nil {

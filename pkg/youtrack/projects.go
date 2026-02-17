@@ -84,7 +84,7 @@ func (c *Client) GetProjectIssues(ctx *YouTrackContext, projectID string, skip, 
 	params.Add("query", fmt.Sprintf("project:{%s}", projectID))
 	params.Add("$skip", fmt.Sprintf("%d", skip))
 	params.Add("$top", fmt.Sprintf("%d", top))
-	params.Add("fields", "idReadable,summary,description,created,updated,resolved,reporter(id,login,fullName,email),updatedBy(id,login,fullName,email),assignee(id,login,fullName,email),tags(id,name,color)")
+	params.Add("fields", "idReadable,summary,description,created,updated,resolved,reporter(id,login,fullName,email),updater(id,login,fullName,email),customFields(name,$type,value(id,name,login,fullName)),tags(id,name,color)")
 
 	resp, err := c.Get(ctx, "/api/issues", params)
 	if err != nil {

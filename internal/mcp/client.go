@@ -260,10 +260,10 @@ func (c *YouTrackClient) AddIssueComment(ctx context.Context, issueID string, co
 
 // Tag Management Methods
 
-// AddIssueTag adds a tag to an issue
-func (c *YouTrackClient) AddIssueTag(ctx context.Context, issueID string, tagName string) error {
+// AddIssueTag adds a tag to an issue by tag ID
+func (c *YouTrackClient) AddIssueTag(ctx context.Context, issueID string, tagID string) error {
 	ytCtx := c.WithContext(ctx)
-	return c.client.AddIssueTag(ytCtx, issueID, tagName)
+	return c.client.AddIssueTag(ytCtx, issueID, tagID)
 }
 
 // EnsureTag ensures a tag exists, returns the tag ID
@@ -395,10 +395,16 @@ func (c *YouTrackClient) GetCurrentUser(ctx context.Context) (*youtrack.User, er
 	return c.client.GetCurrentUser(ytCtx)
 }
 
-// RemoveIssueTag removes a tag from an issue
-func (c *YouTrackClient) RemoveIssueTag(ctx context.Context, issueID string, tagName string) error {
+// RemoveIssueTag removes a tag from an issue by tag ID
+func (c *YouTrackClient) RemoveIssueTag(ctx context.Context, issueID string, tagID string) error {
 	ytCtx := c.WithContext(ctx)
-	return c.client.RemoveIssueTag(ytCtx, issueID, tagName)
+	return c.client.RemoveIssueTag(ytCtx, issueID, tagID)
+}
+
+// GetTagByName returns a tag by name
+func (c *YouTrackClient) GetTagByName(ctx context.Context, name string) (*youtrack.Tag, error) {
+	ytCtx := c.WithContext(ctx)
+	return c.client.GetTagByName(ytCtx, name)
 }
 
 // GetProjectUsers returns users in a project

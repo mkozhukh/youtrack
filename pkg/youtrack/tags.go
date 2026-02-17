@@ -26,11 +26,11 @@ func (c *Client) GetIssueTags(ctx *YouTrackContext, issueID string) ([]*IssueTag
 	return tags, nil
 }
 
-func (c *Client) AddIssueTag(ctx *YouTrackContext, issueID string, tagName string) error {
+func (c *Client) AddIssueTag(ctx *YouTrackContext, issueID string, tagID string) error {
 	path := fmt.Sprintf("/api/issues/%s/tags", issueID)
 
 	req := map[string]interface{}{
-		"name": tagName,
+		"id": tagID,
 	}
 
 	resp, err := c.Post(ctx, path, req)
@@ -42,8 +42,8 @@ func (c *Client) AddIssueTag(ctx *YouTrackContext, issueID string, tagName strin
 	return nil
 }
 
-func (c *Client) RemoveIssueTag(ctx *YouTrackContext, issueID string, tagName string) error {
-	path := fmt.Sprintf("/api/issues/%s/tags/%s", issueID, tagName)
+func (c *Client) RemoveIssueTag(ctx *YouTrackContext, issueID string, tagID string) error {
+	path := fmt.Sprintf("/api/issues/%s/tags/%s", issueID, tagID)
 
 	resp, err := c.Delete(ctx, path)
 	if err != nil {
