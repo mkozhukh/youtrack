@@ -383,6 +383,12 @@ func (c *YouTrackClient) GetIssueAttachmentContent(ctx context.Context, issueID 
 	return c.client.GetIssueAttachmentContent(ytCtx, issueID, attachmentID)
 }
 
+// DownloadByURL downloads raw content from a YouTrack URL
+func (c *YouTrackClient) DownloadByURL(ctx context.Context, rawURL string) ([]byte, error) {
+	ytCtx := c.WithContext(ctx)
+	return c.client.DownloadByURL(ytCtx, rawURL)
+}
+
 // ListTags returns all tags
 func (c *YouTrackClient) ListTags(ctx context.Context, skip, top int) ([]*youtrack.Tag, error) {
 	ytCtx := c.WithContext(ctx)

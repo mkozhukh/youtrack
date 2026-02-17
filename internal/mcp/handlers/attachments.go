@@ -26,6 +26,7 @@ type AttachmentHandlers struct {
 type AttachmentClient interface {
 	GetIssueAttachments(ctx context.Context, issueID string) ([]*youtrack.Attachment, error)
 	GetIssueAttachmentContent(ctx context.Context, issueID string, attachmentID string) ([]byte, error)
+	DownloadByURL(ctx context.Context, rawURL string) ([]byte, error)
 	AddIssueAttachmentFromBytes(ctx context.Context, issueID string, content []byte, filename string) (*youtrack.Attachment, error)
 }
 
@@ -130,38 +131,38 @@ func (h *AttachmentHandlers) GetIssueAttachmentContentHandler(ctx context.Contex
 
 // getAttachmentContentViaFileStore downloads content from YT, stores in filestore, returns local URL
 func (h *AttachmentHandlers) getAttachmentContentViaFileStore(ctx context.Context, issueID, attachmentID string) (*mcp.CallToolResult, error) {
-	// Get attachment metadata first to know the filename
+	// Get attachment metadata to find download URL and filename
 	attachments, err := h.ytClient.GetIssueAttachments(ctx, issueID)
 	if err != nil {
 		return h.errorHandler.HandleError(err, "retrieving attachment metadata"), nil
 	}
 
-	var filename string
-	for _, att := range attachments {
-		if att.ID == attachmentID {
-			filename = att.Name
+	var att *youtrack.Attachment
+	for _, a := range attachments {
+		if a.ID == attachmentID {
+			att = a
 			break
 		}
 	}
-	if filename == "" {
-		filename = attachmentID
+	if att == nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Attachment %s not found on issue %s", attachmentID, issueID)), nil
 	}
 
-	// Download the content
-	data, err := h.ytClient.GetIssueAttachmentContent(ctx, issueID, attachmentID)
+	// Download content using the attachment URL
+	data, err := h.ytClient.DownloadByURL(ctx, att.URL)
 	if err != nil {
 		return h.errorHandler.HandleError(err, "downloading attachment content"), nil
 	}
 
 	// Store in file store
-	fileID, err := h.fileStore.Put(data, filename)
+	fileID, err := h.fileStore.Put(data, att.Name)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to store file: %v", err)), nil
 	}
 
 	url := fmt.Sprintf("%s/mcpfiles/%s", h.fileBaseURL, fileID)
 	response := fmt.Sprintf("Attachment available for download:\n\n")
-	response += fmt.Sprintf("- Name: %s\n", filename)
+	response += fmt.Sprintf("- Name: %s\n", att.Name)
 	response += fmt.Sprintf("- Size: %d bytes\n", len(data))
 	response += fmt.Sprintf("- URL: %s\n", url)
 

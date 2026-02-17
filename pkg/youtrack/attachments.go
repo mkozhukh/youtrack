@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // GetIssueAttachments retrieves all attachments for a specific issue
@@ -100,19 +101,60 @@ func (c *Client) AddIssueAttachment(ctx *YouTrackContext, issueID string, filePa
 	return nil, fmt.Errorf("uploaded attachment not found in response")
 }
 
-// GetIssueAttachmentContent downloads the raw content of an attachment
+// GetIssueAttachmentContent downloads the raw content of an attachment.
+// It first fetches the attachment metadata to get the download URL, then downloads from that URL.
 func (c *Client) GetIssueAttachmentContent(ctx *YouTrackContext, issueID string, attachmentID string) ([]byte, error) {
-	path := fmt.Sprintf("/api/issues/%s/attachments/%s/content", issueID, attachmentID)
-
-	resp, err := c.Get(ctx, path, nil)
+	attachments, err := c.GetIssueAttachments(ctx, issueID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get attachment content: %w", err)
+		return nil, fmt.Errorf("failed to get attachment metadata: %w", err)
+	}
+
+	var downloadURL string
+	for _, att := range attachments {
+		if att.ID == attachmentID {
+			downloadURL = att.URL
+			break
+		}
+	}
+	if downloadURL == "" {
+		return nil, fmt.Errorf("attachment %s not found on issue %s", attachmentID, issueID)
+	}
+
+	return c.DownloadByURL(ctx, downloadURL)
+}
+
+// DownloadByURL downloads raw content from a YouTrack URL (absolute or relative to base URL).
+func (c *Client) DownloadByURL(ctx *YouTrackContext, rawURL string) ([]byte, error) {
+	// Resolve relative URLs against base URL
+	fullURL := rawURL
+	if !strings.HasPrefix(rawURL, "http://") && !strings.HasPrefix(rawURL, "https://") {
+		fullURL = c.baseURL + rawURL
+	}
+
+	req, err := http.NewRequestWithContext(ctx.Context(), http.MethodGet, fullURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+ctx.APIKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("download failed: %w", err)
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read attachment content: %w", err)
+		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	return data, nil
