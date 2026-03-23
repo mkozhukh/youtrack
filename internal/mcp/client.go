@@ -195,11 +195,6 @@ func (c *YouTrackClient) GetIssue(ctx context.Context, issueID string) (*youtrac
 func (c *YouTrackClient) SearchIssues(ctx context.Context, query string, skip, top int) ([]*youtrack.Issue, error) {
 	ytCtx := c.WithContext(ctx)
 
-	// Use default query if empty
-	if query == "" {
-		query = c.config.DefaultQuery
-	}
-
 	// Use default max results if top is 0
 	if top == 0 {
 		top = c.config.MaxResults
@@ -345,11 +340,6 @@ func (c *YouTrackClient) ApplyCommand(ctx context.Context, issueID string, comma
 // SearchIssuesSorted searches for issues with sorting
 func (c *YouTrackClient) SearchIssuesSorted(ctx context.Context, query string, skip, top int, sortBy, sortOrder string) ([]*youtrack.Issue, error) {
 	ytCtx := c.WithContext(ctx)
-
-	// Use default query if empty
-	if query == "" {
-		query = c.config.DefaultQuery
-	}
 
 	// Use default max results if top is 0
 	if top == 0 {

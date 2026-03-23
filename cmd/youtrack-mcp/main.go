@@ -38,7 +38,6 @@ type Config struct {
 		APIKey         string `koanf:"api_key"`
 		DefaultProject string `koanf:"default_project"`
 		Timeout        int    `koanf:"timeout"`
-		DefaultQuery   string `koanf:"default_query"`
 		MaxResults     int    `koanf:"max_results"`
 	} `koanf:"youtrack"`
 	Cache struct {
@@ -152,7 +151,6 @@ func run(cmd *cobra.Command, args []string, useHTTP bool) error {
 			APIKey:         config.YouTrack.APIKey,
 			DefaultProject: config.YouTrack.DefaultProject,
 			Timeout:        config.YouTrack.Timeout,
-			DefaultQuery:   config.YouTrack.DefaultQuery,
 			MaxResults:     config.YouTrack.MaxResults,
 		},
 		Cache: mcp.CacheConfig{

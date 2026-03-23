@@ -26,9 +26,6 @@ default_project = "PROJ"
 # API timeout in seconds
 timeout = 30
 
-# Default query for issue listing
-default_query = "updated: -7d"
-
 # Default max results for issue listing
 max_results = 10
 

@@ -320,10 +320,6 @@ func (h *IssueHandlers) buildOptimizedQuery(projectID, userQuery string, hasExpl
 	// If user provided a query, add it to the project filter
 	if userQuery != "" {
 		query = fmt.Sprintf("%s %s", query, userQuery)
-	} else if !hasExplicitSort {
-		// Apply smart defaults only when no explicit sort and no user query
-		query = fmt.Sprintf("%s updated: {Last week}", query)
-		query = fmt.Sprintf("%s sort by: updated desc", query)
 	}
 
 	// Add default sorting only if no sort is present at all

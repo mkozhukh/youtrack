@@ -23,7 +23,6 @@ type YouTrackConfig struct {
 	APIKey         string `koanf:"api_key"`
 	DefaultProject string `koanf:"default_project"`
 	Timeout        int    `koanf:"timeout"`
-	DefaultQuery   string `koanf:"default_query"`
 	MaxResults     int    `koanf:"max_results"`
 }
 
