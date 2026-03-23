@@ -81,8 +81,9 @@ func (h *IssueHandlers) GetIssueListHandler(ctx context.Context, request mcp.Cal
 		h.projectTracker.TrackProject(ctx, projectID)
 	}
 
-	// Build optimized query with smart defaults
-	optimizedQuery := h.buildOptimizedQuery(projectID, query)
+	// Build query: only add smart defaults (time filter + sort) when no explicit sort is requested
+	hasSortParam := sortBy != ""
+	optimizedQuery := h.buildOptimizedQuery(projectID, query, hasSortParam)
 
 	// Log the tool call
 	if h.toolLogger != nil {
@@ -98,7 +99,7 @@ func (h *IssueHandlers) GetIssueListHandler(ctx context.Context, request mcp.Cal
 
 	// Search for issues — use sorted search if sort_by is provided
 	var issues []*youtrack.Issue
-	if sortBy != "" {
+	if hasSortParam {
 		issues, err = h.ytClient.SearchIssuesSorted(ctx, optimizedQuery, 0, maxResultsInt, sortBy, sortOrder)
 	} else {
 		issues, err = h.ytClient.SearchIssues(ctx, optimizedQuery, 0, maxResultsInt)
@@ -312,21 +313,21 @@ func (h *IssueHandlers) UpdateIssueHandler(ctx context.Context, request mcp.Call
 // Helper functions for query optimization and formatting
 
 // buildOptimizedQuery creates an optimized query with smart defaults
-func (h *IssueHandlers) buildOptimizedQuery(projectID, userQuery string) string {
+func (h *IssueHandlers) buildOptimizedQuery(projectID, userQuery string, hasExplicitSort bool) string {
 	// Start with project filter
 	query := fmt.Sprintf("project: %s", projectID)
 
 	// If user provided a query, add it to the project filter
 	if userQuery != "" {
 		query = fmt.Sprintf("%s %s", query, userQuery)
-	} else {
-		// Apply smart defaults when no query is provided
-		query = fmt.Sprintf("%s updated: {Last week}", query)  // Show issues updated in last 30 days
-		query = fmt.Sprintf("%s sort by: updated desc", query) // Sort by most recently updated
+	} else if !hasExplicitSort {
+		// Apply smart defaults only when no explicit sort and no user query
+		query = fmt.Sprintf("%s updated: {Last week}", query)
+		query = fmt.Sprintf("%s sort by: updated desc", query)
 	}
 
-	// Add sorting if not already present
-	if !strings.Contains(query, "sort by:") {
+	// Add default sorting only if no sort is present at all
+	if !hasExplicitSort && !strings.Contains(query, "sort by:") {
 		query = fmt.Sprintf("%s sort by: updated desc", query)
 	}
 
