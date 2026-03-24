@@ -17,6 +17,9 @@ tool_error_log_path = "tool_errors.log"
 # YouTrack instance base URL
 base_url = "https://youtrack.example.com"
 
+# Hub instance URL (required for standalone Hub; omit if Hub is built into YouTrack)
+# hub_url = "https://hub.example.com"
+
 # YouTrack API key (can be set via YOUTRACK_YOUTRACK_API_KEY env var)
 api_key = "your_api_key_here"
 

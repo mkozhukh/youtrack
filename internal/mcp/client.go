@@ -28,6 +28,9 @@ func NewYouTrackClient(config YouTrackConfig, appLogger *logging.AppLogger) (*Yo
 
 	// Create the base client
 	client := youtrack.NewClient(config.BaseURL)
+	if config.HubURL != "" {
+		client.SetHubURL(config.HubURL)
+	}
 
 	// Set up REST logger if app logger is provided and API key is available
 	if appLogger != nil && config.APIKey != "" {

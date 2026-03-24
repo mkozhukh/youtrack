@@ -18,6 +18,7 @@ type RESTLogger interface {
 
 type Client struct {
 	baseURL    string
+	hubURL     string
 	httpClient *http.Client
 	logger     RESTLogger
 }
@@ -25,6 +26,11 @@ type Client struct {
 // SetLogger sets the REST logger for the client
 func (c *Client) SetLogger(logger RESTLogger) {
 	c.logger = logger
+}
+
+// SetHubURL sets the Hub instance URL for Hub REST API calls (e.g. project team users).
+func (c *Client) SetHubURL(hubURL string) {
+	c.hubURL = hubURL
 }
 
 func NewClient(baseURL string) *Client {
@@ -37,9 +43,13 @@ func NewClient(baseURL string) *Client {
 }
 
 func (c *Client) doRequest(ctx *YouTrackContext, method, path string, query url.Values, body interface{}) (*http.Response, error) {
+	return c.doRequestWithBase(c.baseURL, ctx, method, path, query, body)
+}
+
+func (c *Client) doRequestWithBase(baseURL string, ctx *YouTrackContext, method, path string, query url.Values, body interface{}) (*http.Response, error) {
 	start := time.Now()
 
-	u, err := url.Parse(c.baseURL)
+	u, err := url.Parse(baseURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid base URL: %w", err)
 	}
@@ -102,6 +112,13 @@ func (c *Client) doRequest(ctx *YouTrackContext, method, path string, query url.
 
 func (c *Client) Get(ctx *YouTrackContext, path string, query url.Values) (*http.Response, error) {
 	return c.doRequest(ctx, http.MethodGet, path, query, nil)
+}
+
+func (c *Client) hubGet(ctx *YouTrackContext, path string, query url.Values) (*http.Response, error) {
+	if c.hubURL == "" {
+		return nil, fmt.Errorf("hub URL is not configured; set hub_url in config to use project team features")
+	}
+	return c.doRequestWithBase(c.hubURL, ctx, http.MethodGet, path, query, nil)
 }
 
 func (c *Client) Post(ctx *YouTrackContext, path string, body interface{}) (*http.Response, error) {

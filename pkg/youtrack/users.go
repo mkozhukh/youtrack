@@ -80,25 +80,80 @@ func (c *Client) GetUserByLogin(ctx *YouTrackContext, login string) (*User, erro
 }
 
 func (c *Client) GetProjectUsers(ctx *YouTrackContext, projectID string, skip, top int) ([]*User, error) {
-	path := fmt.Sprintf("/api/admin/projects/%s/team/users", projectID)
+	// Step 1: Get the project's ringId (Hub entity ID)
+	ringID, err := c.getProjectRingID(ctx, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get project ringId: %w", err)
+	}
+
+	// Step 2: Fetch team users via Hub REST API
+	path := fmt.Sprintf("/hub/api/rest/projects/%s/team/users", ringID)
 
 	params := url.Values{}
 	params.Add("$skip", fmt.Sprintf("%d", skip))
 	params.Add("$top", fmt.Sprintf("%d", top))
-	params.Add("fields", "id,login,fullName,email")
+	params.Add("fields", "id,login,name,profile(email(email))")
 
-	resp, err := c.Get(ctx, path, params)
+	resp, err := c.hubGet(ctx, path, params)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	var users []*User
-	if err := json.NewDecoder(resp.Body).Decode(&users); err != nil {
+	var hubResp struct {
+		Users []struct {
+			ID      string `json:"id"`
+			Login   string `json:"login"`
+			Name    string `json:"name"`
+			Profile struct {
+				Email struct {
+					Email string `json:"email"`
+				} `json:"email"`
+			} `json:"profile"`
+		} `json:"users"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&hubResp); err != nil {
 		return nil, fmt.Errorf("failed to decode project users: %w", err)
 	}
 
+	users := make([]*User, len(hubResp.Users))
+	for i, hu := range hubResp.Users {
+		users[i] = &User{
+			ID:       hu.ID,
+			Login:    hu.Login,
+			FullName: hu.Name,
+			Email:    hu.Profile.Email.Email,
+		}
+	}
+
 	return users, nil
+}
+
+// getProjectRingID retrieves the Hub entity ID (ringId) for a YouTrack project.
+func (c *Client) getProjectRingID(ctx *YouTrackContext, projectID string) (string, error) {
+	path := fmt.Sprintf("/api/admin/projects/%s", projectID)
+
+	params := url.Values{}
+	params.Add("fields", "ringId")
+
+	resp, err := c.Get(ctx, path, params)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		RingID string `json:"ringId"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode project ringId: %w", err)
+	}
+
+	if result.RingID == "" {
+		return "", fmt.Errorf("project '%s' has no ringId", projectID)
+	}
+
+	return result.RingID, nil
 }
 
 func (c *Client) SuggestUserByProject(ctx *YouTrackContext, projectID string, username string) (*User, error) {

@@ -22,8 +22,9 @@ type Config struct {
 
 // ServerConfig holds server-related configuration
 type ServerConfig struct {
-	URL   string `koanf:"url"`
-	Token string `koanf:"token"`
+	URL    string `koanf:"url"`
+	Token  string `koanf:"token"`
+	HubURL string `koanf:"hub_url"`
 }
 
 // DefaultsConfig holds default values
@@ -125,8 +126,9 @@ func Save(cfg *Config, configPath string) error {
 	// Marshal the config to TOML
 	data, err := toml.Parser().Marshal(map[string]interface{}{
 		"server": map[string]interface{}{
-			"url":   cfg.Server.URL,
-			"token": cfg.Server.Token,
+			"url":     cfg.Server.URL,
+			"token":   cfg.Server.Token,
+			"hub_url": cfg.Server.HubURL,
 		},
 		"defaults": map[string]interface{}{
 			"project": cfg.Defaults.Project,

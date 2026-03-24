@@ -85,6 +85,9 @@ func listUsers(cmd *cobra.Command, args []string) error {
 
 	// Create client and context
 	client := youtrack.NewClient(cfg.Server.URL)
+	if cfg.Server.HubURL != "" {
+		client.SetHubURL(cfg.Server.HubURL)
+	}
 	ctx := youtrack.NewYouTrackContext(context.Background(), cfg.Server.Token)
 
 	// Fetch all project users
@@ -116,6 +119,9 @@ func getUserWorklogs(cmd *cobra.Command, args []string) error {
 
 	// Create client and context
 	client := youtrack.NewClient(cfg.Server.URL)
+	if cfg.Server.HubURL != "" {
+		client.SetHubURL(cfg.Server.HubURL)
+	}
 	ctx := youtrack.NewYouTrackContext(context.Background(), cfg.Server.Token)
 
 	// Find the user (with partial matching)

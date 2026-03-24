@@ -21,6 +21,7 @@ import (
 type YouTrackConfig struct {
 	BaseURL        string `koanf:"base_url"`
 	APIKey         string `koanf:"api_key"`
+	HubURL         string `koanf:"hub_url"`
 	DefaultProject string `koanf:"default_project"`
 	Timeout        int    `koanf:"timeout"`
 	MaxResults     int    `koanf:"max_results"`
