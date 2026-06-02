@@ -88,8 +88,47 @@ func showTicket(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get ticket %s: %w", ticketID, err)
 	}
 
-	// Output results
-	return outputResult(cmd, ticket, formatTicketDetails)
+	if !withFields {
+		return outputResult(cmd, ticket, formatTicketDetails)
+	}
+
+	fields, err := client.GetIssueCustomFields(ctx, ticketID)
+	if err != nil {
+		log.Error("Failed to get custom fields", "ticketID", ticketID, "error", err)
+		return fmt.Errorf("failed to get custom fields for %s: %w", ticketID, err)
+	}
+
+	return outputResult(cmd, &IssueWithFields{Issue: ticket, CustomFields: fields}, formatTicketDetailsWithFields)
+}
+
+// showTicketFields handles the fields command
+func showTicketFields(cmd *cobra.Command, args []string) error {
+	ticketID := args[0]
+
+	if !isValidTicketID(ticketID) {
+		return fmt.Errorf("invalid ticket ID format: %s (expected format: PRJ-123)", ticketID)
+	}
+
+	cfg, err := config.Load("", cmd.Flags())
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+	if err := cfg.Validate(); err != nil {
+		return fmt.Errorf("invalid configuration: %w", err)
+	}
+
+	client := youtrack.NewClient(cfg.Server.URL)
+	ctx := youtrack.NewYouTrackContext(context.Background(), cfg.Server.Token)
+
+	log.Info("Fetching custom fields", "ticketID", ticketID)
+
+	fields, err := client.GetIssueCustomFields(ctx, ticketID)
+	if err != nil {
+		log.Error("Failed to get custom fields", "ticketID", ticketID, "error", err)
+		return fmt.Errorf("failed to get custom fields for %s: %w", ticketID, err)
+	}
+
+	return outputResult(cmd, fields, formatCustomFieldsList)
 }
 
 // createTicket handles the create ticket command

@@ -121,6 +121,56 @@ func formatTicketDetails(data interface{}) error {
 	return nil
 }
 
+// formatTicketDetailsWithFields formats ticket details including custom fields for text output
+func formatTicketDetailsWithFields(data interface{}) error {
+	issue := data.(*IssueWithFields)
+	if err := formatTicketDetails(issue.Issue); err != nil {
+		return err
+	}
+
+	if len(issue.CustomFields) > 0 {
+		fmt.Printf("\nCustom Fields\n")
+		fmt.Printf("─────────────\n")
+		for _, f := range issue.CustomFields {
+			fmt.Printf("%-20s %s\n", f.Name+":", formatCustomFieldValue(f.Value))
+		}
+	}
+
+	return nil
+}
+
+// formatCustomFieldsList formats custom fields list for text output
+func formatCustomFieldsList(data interface{}) error {
+	fields := data.([]*youtrack.CustomFieldValue)
+
+	if len(fields) == 0 {
+		fmt.Println("No custom fields found")
+		return nil
+	}
+
+	for _, f := range fields {
+		fmt.Printf("%-20s %s\n", f.Name+":", formatCustomFieldValue(f.Value))
+	}
+
+	return nil
+}
+
+// formatCustomFieldValue formats a custom field value for display
+func formatCustomFieldValue(value interface{}) string {
+	if value == nil {
+		return "(none)"
+	}
+	if m, ok := value.(map[string]interface{}); ok {
+		if name, ok := m["name"].(string); ok && name != "" {
+			return name
+		}
+		if login, ok := m["login"].(string); ok && login != "" {
+			return login
+		}
+	}
+	return fmt.Sprintf("%v", value)
+}
+
 // formatTicketCreated formats the created ticket for text output
 func formatTicketCreated(data interface{}) error {
 	ticket := data.(*youtrack.Issue)

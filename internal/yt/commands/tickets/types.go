@@ -41,3 +41,9 @@ type HistorySummary struct {
 	TicketID   string
 	Activities []*youtrack.ActivityItem
 }
+
+// IssueWithFields wraps an issue with its custom fields
+type IssueWithFields struct {
+	*youtrack.Issue
+	CustomFields []*youtrack.CustomFieldValue `json:"customFields"`
+}

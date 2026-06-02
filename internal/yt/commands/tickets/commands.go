@@ -32,6 +32,9 @@ var (
 	// Link command flags
 	linkType string
 
+	// Show command flags
+	withFields bool
+
 	// Global output flag from parent
 	output string
 )
@@ -196,6 +199,15 @@ var historyCmd = &cobra.Command{
 	RunE:  showHistory,
 }
 
+// fieldsCmd represents the fields command
+var fieldsCmd = &cobra.Command{
+	Use:   "fields <ticket_id>",
+	Short: "Shows all custom fields for a specific ticket",
+	Long:  `Shows all custom fields and their values for a specific ticket.`,
+	Args:  cobra.ExactArgs(1),
+	RunE:  showTicketFields,
+}
+
 func init() {
 	// Add subcommands
 	TicketsCmd.AddCommand(listTicketsCmd)
@@ -209,6 +221,7 @@ func init() {
 	TicketsCmd.AddCommand(worklogsCmd)
 	TicketsCmd.AddCommand(linksCmd)
 	TicketsCmd.AddCommand(historyCmd)
+	TicketsCmd.AddCommand(fieldsCmd)
 
 	// Add comments subcommands
 	commentsCmd.AddCommand(listCommentsCmd)
@@ -258,4 +271,7 @@ func init() {
 
 	// Add flags for link add command
 	addLinkCmd.Flags().StringVar(&linkType, "type", "relates to", "The relationship type (e.g., 'relates to', 'is duplicated by')")
+
+	// Add flags for show command
+	showTicketCmd.Flags().BoolVar(&withFields, "with-fields", false, "Fetch and include all custom fields in the output")
 }
