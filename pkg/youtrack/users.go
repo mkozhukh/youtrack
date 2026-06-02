@@ -67,16 +67,20 @@ func (c *Client) SearchUsers(ctx *YouTrackContext, query string, skip, top int) 
 }
 
 func (c *Client) GetUserByLogin(ctx *YouTrackContext, login string) (*User, error) {
-	users, err := c.SearchUsers(ctx, fmt.Sprintf("login:%s", login), 0, 1)
+	users, err := c.SearchUsers(ctx, fmt.Sprintf("login:%s", login), 0, 10)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(users) == 0 {
-		return nil, fmt.Errorf("user with login '%s' not found", login)
+	// The /api/users query is a fuzzy full-text search (login/fullName/email),
+	// so verify the login matches exactly rather than trusting the first result.
+	for _, u := range users {
+		if strings.EqualFold(u.Login, login) {
+			return u, nil
+		}
 	}
 
-	return users[0], nil
+	return nil, fmt.Errorf("user with login '%s' not found", login)
 }
 
 func (c *Client) GetProjectUsers(ctx *YouTrackContext, projectID string, skip, top int) ([]*User, error) {
@@ -164,6 +168,7 @@ func (c *Client) SuggestUserByProject(ctx *YouTrackContext, projectID string, us
 	lowercaseUsername := strings.ToLower(username)
 
 	// Get all users for the project with pagination
+	var all []*User
 	skip := 0
 	top := 100
 
@@ -177,15 +182,7 @@ func (c *Client) SuggestUserByProject(ctx *YouTrackContext, projectID string, us
 			break
 		}
 
-		// Search for matching user
-		for _, user := range users {
-			// Check if username matches any of the user fields (case-insensitive)
-			if strings.Contains(strings.ToLower(user.Login), lowercaseUsername) ||
-				strings.Contains(strings.ToLower(user.FullName), lowercaseUsername) ||
-				strings.Contains(strings.ToLower(user.Email), lowercaseUsername) {
-				return user, nil
-			}
-		}
+		all = append(all, users...)
 
 		// If we got fewer results than requested, we've reached the end
 		if len(users) < top {
@@ -193,6 +190,22 @@ func (c *Client) SuggestUserByProject(ctx *YouTrackContext, projectID string, us
 		}
 
 		skip += len(users)
+	}
+
+	// Prefer an exact login match across the whole team
+	for _, user := range all {
+		if strings.EqualFold(user.Login, username) {
+			return user, nil
+		}
+	}
+
+	// Fall back to a substring match on login/fullName/email
+	for _, user := range all {
+		if strings.Contains(strings.ToLower(user.Login), lowercaseUsername) ||
+			strings.Contains(strings.ToLower(user.FullName), lowercaseUsername) ||
+			strings.Contains(strings.ToLower(user.Email), lowercaseUsername) {
+			return user, nil
+		}
 	}
 
 	return nil, fmt.Errorf("no user found matching '%s' in project '%s'", username, projectID)
